@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S1 Radiculopathy Rehab Timer</title>
+<style>
+  :root{
+    --bg:#0f172a;
+    --panel:#111827;
+    --text:#f8fafc;
+    --muted:#cbd5e1;
+    --accent:#38bdf8;
+    --warn:#f59e0b;
+    --rest:#22c55e;
+    --danger:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:linear-gradient(180deg,#0f172a,#020617);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:18px;
+  }
+  .app{
+    width:min(760px,100%);
+    background:rgba(17,24,39,.96);
+    border:1px solid #334155;
+    border-radius:24px;
+    overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+  }
+  header{padding:18px 20px 10px;text-align:center}
+  h1{font-size:clamp(1.35rem,3vw,2rem);margin:0 0 6px}
+  .sub{color:var(--muted);font-size:.95rem}
+  .selector{
+    display:flex; gap:10px; padding:12px 20px 4px;
+  }
+  .selector button,.controls button{
+    flex:1;
+    border:0;
+    border-radius:14px;
+    padding:12px 14px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .selector button{
+    background:#1e293b;color:#e2e8f0;border:1px solid #334155;
+  }
+  .selector button.active{background:var(--accent);color:#082f49}
+  .stage{
+    padding:18px 20px 8px;
+    text-align:center;
+  }
+  .image-wrap{
+    width:100%;
+    aspect-ratio:16/9;
+    background:#f8fafc;
+    border-radius:18px;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:16px;
+  }
+  svg{width:100%;height:100%}
+  .phase{
+    text-transform:uppercase;
+    letter-spacing:.16em;
+    color:var(--accent);
+    font-size:.8rem;
+    font-weight:800;
+  }
+  .exercise{
+    font-size:clamp(1.5rem,4vw,2.4rem);
+    margin:8px 0 6px;
+    font-weight:800;
+  }
+  .cue{color:var(--muted);min-height:2.8em}
+  .timer{
+    font-variant-numeric:tabular-nums;
+    font-size:clamp(4.2rem,15vw,8rem);
+    line-height:1;
+    font-weight:900;
+    margin:14px 0 8px;
+  }
+  .timer.warn{color:var(--warn)}
+  .timer.rest{color:var(--rest)}
+  .progress-track{
+    height:10px;
+    background:#1e293b;
+    border-radius:999px;
+    overflow:hidden;
+    margin:10px 20px;
+  }
+  .progress{height:100%;width:0;background:var(--accent);transition:width .3s linear}
+  .statusrow{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:8px 20px 14px;
+    color:var(--muted);
+    font-size:.92rem;
+  }
+  .controls{
+    display:flex;
+    gap:10px;
+    padding:0 20px 20px;
+    flex-wrap:wrap;
+  }
+  .controls button{background:#e2e8f0;color:#0f172a;min-width:120px}
+  .controls .primary{background:var(--accent);color:#082f49}
+  .controls .danger{background:#fecaca;color:#7f1d1d}
+  .notes{
+    border-top:1px solid #334155;
+    padding:14px 20px 18px;
+    color:#cbd5e1;
+    font-size:.88rem;
+    line-height:1.45;
+  }
+  .notes strong{color:white}
+  @media (max-width:520px){
+    .controls button{min-width:calc(50% - 5px)}
+    .statusrow{font-size:.8rem}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>S1 Radiculopathy Rehab Timer</h1>
+    <div class="sub">15-minute guided morning and evening sessions</div>
+  </header>
+
+  <div class="selector">
+    <button id="morningBtn" class="active">Morning</button>
+    <button id="eveningBtn">Evening</button>
+  </div>
+
+  <div class="stage">
+    <div class="image-wrap" id="imageWrap"></div>
+    <div class="phase" id="phaseLabel">READY</div>
+    <div class="exercise" id="exerciseName">Morning routine</div>
+    <div class="cue" id="cue">Press Start when ready.</div>
+    <div class="timer" id="timer">15:00</div>
+  </div>
+
+  <div class="progress-track"><div class="progress" id="progress"></div></div>
+  <div class="statusrow">
+    <span id="stepLabel">Exercise 1 of 7</span>
+    <span id="elapsedLabel">Session 00:00 / 15:00</span>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="startPauseBtn">Start</button>
+    <button id="skipBtn">Skip</button>
+    <button class="danger" id="restartBtn">Restart</button>
+    <button id="voiceBtn">Voice: On</button>
+  </div>
+
+  <div class="notes">
+    <strong>Symptom rule:</strong> stop an exercise if it repeatedly drives pain, tingling or numbness farther down the leg or clearly worsens neurological symptoms.
+    Seek urgent assessment for new bladder/bowel disturbance, saddle numbness, or rapidly progressive weakness.
+  </div>
+</div>
+
+<script>
+const REST = 15;
+
+function svgScene(type){
+  const head = '<circle cx="220" cy="96" r="24" fill="#0f172a"/>';
+  const line = (x1,y1,x2,y2,w=16)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#0f172a" stroke-width="${w}" stroke-linecap="round"/>`;
+  const base = `<svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
+    <rect width="640" height="360" fill="#f8fafc"/>
+    <line x1="70" y1="300" x2="570" y2="300" stroke="#94a3b8" stroke-width="5" stroke-linecap="round"/>`;
+  let body = '';
+  if(type==='walk'){
+    body = head + line(220,122,265,190) + line(265,190,220,280) + line(265,190,330,278) + line(245,155,180,205) + line(245,155,310,120);
+  } else if(type==='prone'){
+    body = `<circle cx="170" cy="235" r="22" fill="#0f172a"/>` +
+           line(190,235,330,235) + line(330,235,460,245) + line(330,235,460,280) +
+           line(230,235,190,290) + line(240,235,285,285);
+  } else if(type==='pressup'){
+    body = `<circle cx="190" cy="170" r="22" fill="#0f172a"/>` +
+           line(210,182,315,225) + line(315,225,460,245) + line(315,225,455,280) +
+           line(245,198,220,285) + line(270,205,300,285);
+  } else if(type==='slider'){
+    body = `<circle cx="150" cy="245" r="22" fill="#0f172a"/>` +
+           line(170,245,300,245) + line(300,245,390,190) + line(390,190,505,145) +
+           line(300,245,420,280) + line(220,245,175,285);
+  } else if(type==='bridge'){
+    body = `<circle cx="155" cy="250" r="22" fill="#0f172a"/>` +
+           line(175,250,300,215) + line(300,215,390,245) + line(390,245,455,295) +
+           line(300,215,225,295);
+  } else if(type==='bird'){
+    body = `<circle cx="235" cy="150" r="22" fill="#0f172a"/>` +
+           line(250,170,340,205) + line(340,205,420,140) + line(340,205,495,240) +
+           line(275,185,215,275) + line(305,195,330,280);
+  } else if(type==='calf'){
+    body = head + line(220,120,225,205) + line(225,205,190,280) + line(225,205,260,280) +
+           line(220,150,165,190) + line(220,150,275,190) +
+           `<path d="M170 300 Q220 280 270 300" fill="none" stroke="#38bdf8" stroke-width="8" stroke-linecap="round"/>`;
+  } else if(type==='squat'){
+    body = `<circle cx="230" cy="130" r="22" fill="#0f172a"/>` +
+           line(240,150,285,205) + line(285,205,220,245) + line(220,245,185,295) +
+           line(285,205,350,245) + line(350,245,390,295) + line(265,185,195,200) + line(265,185,335,205);
+  } else if(type==='rest'){
+    body = `<circle cx="320" cy="180" r="86" fill="#dcfce7" stroke="#22c55e" stroke-width="8"/>
+            <path d="M320 125 v58 l38 28" fill="none" stroke="#166534" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  return base + body + '</svg>';
+}
+
+// Durations are chosen so each complete session, including 6 x 15s rests, totals exactly 15:00.
+const routines = {
+  morning: [
+    {name:'Easy Walking', sec:150, img:'walk', cue:'Comfortable pace. Stay relaxed and upright.'},
+    {name:'Prone Lying → Elbows', sec:90, img:'prone', cue:'Relax the back. Only prop onto elbows if comfortable.'},
+    {name:'Lumbar Press-Ups', sec:90, img:'pressup', cue:'Keep pelvis down. Stop if symptoms move farther into the calf or foot.'},
+    {name:'Sciatic Nerve Slider', sec:90, img:'slider', cue:'Gentle gliding only — do not hold a nerve stretch.'},
+    {name:'Bridge', sec:120, img:'bridge', cue:'Lift smoothly, squeeze glutes, lower with control.'},
+    {name:'Double-Leg Calf Raises', sec:120, img:'calf', cue:'Rise slowly, pause briefly, lower under control.'},
+    {name:'Easy Walking Finish', sec:150, img:'walk', cue:'Finish with relaxed movement rather than sitting immediately.'}
+  ],
+  evening: [
+    {name:'Comfortable Walking', sec:180, img:'walk', cue:'Easy pace to loosen up before the exercises.'},
+    {name:'Lumbar Press-Ups', sec:90, img:'pressup', cue:'Continue only if leg symptoms centralise or remain stable.'},
+    {name:'Sciatic Nerve Slider', sec:90, img:'slider', cue:'Move gently. Avoid sustained tension.'},
+    {name:'Bird-Dog', sec:120, img:'bird', cue:'Keep pelvis level. Use a smaller range if symptoms increase.'},
+    {name:'Calf / S1 Strengthening', sec:120, img:'calf', cue:'Use support. Progress toward single-leg work only when comfortable.'},
+    {name:'Sit-to-Stand / Shallow Squat', sec:120, img:'squat', cue:'Keep the movement controlled and symptom-free.'},
+    {name:'Relaxed Walking Finish', sec:90, img:'walk', cue:'Cool down with easy movement.'}
+  ]
+};
+
+let routineKey='morning';
+let timeline=[];
+let index=0;
+let remaining=0;
+let sessionElapsed=0;
+let running=false;
+let ticker=null;
+let voiceOn=true;
+let warned10=false;
+
+const els = {
+  morningBtn:document.getElementById('morningBtn'),
+  eveningBtn:document.getElementById('eveningBtn'),
+  imageWrap:document.getElementById('imageWrap'),
+  phase:document.getElementById('phaseLabel'),
+  name:document.getElementById('exerciseName'),
+  cue:document.getElementById('cue'),
+  timer:document.getElementById('timer'),
+  progress:document.getElementById('progress'),
+  step:document.getElementById('stepLabel'),
+  elapsed:document.getElementById('elapsedLabel'),
+  startPause:document.getElementById('startPauseBtn'),
+  skip:document.getElementById('skipBtn'),
+  restart:document.getElementById('restartBtn'),
+  voice:document.getElementById('voiceBtn')
+};
+
+function buildTimeline(){
+  timeline=[];
+  const arr=routines[routineKey];
+  arr.forEach((ex,i)=>{
+    timeline.push({kind:'exercise',...ex,exerciseNumber:i+1});
+    if(i<arr.length-1) timeline.push({
+      kind:'rest',name:'Rest',sec:REST,img:'rest',
+      cue:`Next: ${arr[i+1].name}`,exerciseNumber:i+1
+    });
+  });
+}
+
+function fmt(s){
+  s=Math.max(0,Math.round(s));
+  const m=Math.floor(s/60), sec=s%60;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function speak(text){
+  if(!voiceOn || !('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=1.02;
+  u.pitch=1;
+  speechSynthesis.speak(u);
+}
+
+function totalDuration(){ return timeline.reduce((a,b)=>a+b.sec,0); }
+
+function loadStep(i, announce=false){
+  index=i;
+  const item=timeline[index];
+  remaining=item.sec;
+  warned10=false;
+  els.imageWrap.innerHTML=svgScene(item.img);
+  els.phase.textContent=item.kind==='rest'?'REST':'EXERCISE';
+  els.phase.style.color=item.kind==='rest'?'var(--rest)':'var(--accent)';
+  els.name.textContent=item.name;
+  els.cue.textContent=item.cue;
+  els.timer.textContent=fmt(remaining);
+  els.timer.className='timer'+(item.kind==='rest'?' rest':'');
+  const exCount=routines[routineKey].length;
+  els.step.textContent=item.kind==='rest'
+    ? `Rest • ${item.cue}`
+    : `Exercise ${item.exerciseNumber} of ${exCount}`;
+  updateProgress();
+  if(announce){
+    if(item.kind==='rest') speak(`Rest for 15 seconds. ${item.cue}.`);
+    else speak(`Next exercise: ${item.name}.`);
+  }
+}
+
+function updateProgress(){
+  const total=totalDuration();
+  els.elapsed.textContent=`Session ${fmt(sessionElapsed)} / ${fmt(total)}`;
+  els.progress.style.width=`${Math.min(100,(sessionElapsed/total)*100)}%`;
+}
+
+function tick(){
+  if(!running) return;
+  remaining--;
+  sessionElapsed++;
+  const item=timeline[index];
+
+  if(remaining===10 && !warned10){
+    warned10=true;
+    speak('10 seconds remaining.');
+  }
+
+  if(remaining<=0){
+    if(index < timeline.length-1){
+      loadStep(index+1,true);
+    } else {
+      running=false;
+      clearInterval(ticker);
+      ticker=null;
+      remaining=0;
+      els.timer.textContent='00:00';
+      els.startPause.textContent='Start';
+      els.phase.textContent='COMPLETE';
+      els.name.textContent='Session complete';
+      els.cue.textContent='Well done. Finish with comfortable movement.';
+      els.imageWrap.innerHTML=svgScene('walk');
+      sessionElapsed=totalDuration();
+      updateProgress();
+      speak('Session complete.');
+      return;
+    }
+  }
+
+  els.timer.textContent=fmt(remaining);
+  els.timer.className='timer'+(item.kind==='rest'?' rest':'')+(remaining<=10 && item.kind!=='rest'?' warn':'');
+  updateProgress();
+}
+
+function startPause(){
+  if(!running){
+    if(sessionElapsed>=totalDuration()) restart(false);
+    running=true;
+    els.startPause.textContent='Pause';
+    const item=timeline[index];
+    speak(item.kind==='rest' ? 'Rest.' : `Begin ${item.name}.`);
+    ticker=setInterval(tick,1000);
+  }else{
+    running=false;
+    els.startPause.textContent='Resume';
+    clearInterval(ticker); ticker=null;
+    speak('Paused.');
+  }
+}
+
+function skip(){
+  if(index<timeline.length-1){
+    sessionElapsed += remaining;
+    loadStep(index+1,true);
+  } else {
+    sessionElapsed=totalDuration();
+    tick();
+  }
+}
+
+function restart(announce=true){
+  running=false;
+  if(ticker){clearInterval(ticker);ticker=null;}
+  sessionElapsed=0;
+  buildTimeline();
+  loadStep(0,false);
+  els.startPause.textContent='Start';
+  if(announce) speak('Session reset.');
+}
+
+function selectRoutine(key){
+  routineKey=key;
+  els.morningBtn.classList.toggle('active',key==='morning');
+  els.eveningBtn.classList.toggle('active',key==='evening');
+  restart(false);
+  els.name.textContent=key==='morning'?'Morning routine':'Evening routine';
+  els.cue.textContent='Press Start when ready.';
+  els.phase.textContent='READY';
+  els.timer.textContent='15:00';
+}
+
+els.startPause.addEventListener('click',startPause);
+els.skip.addEventListener('click',skip);
+els.restart.addEventListener('click',()=>restart(true));
+els.voice.addEventListener('click',()=>{
+  voiceOn=!voiceOn;
+  els.voice.textContent=`Voice: ${voiceOn?'On':'Off'}`;
+  if(voiceOn) speak('Voice prompts on.');
+  else if('speechSynthesis' in window) speechSynthesis.cancel();
+});
+els.morningBtn.addEventListener('click',()=>selectRoutine('morning'));
+els.eveningBtn.addEventListener('click',()=>selectRoutine('evening'));
+
+buildTimeline();
+loadStep(0,false);
+els.name.textContent='Morning routine';
+els.cue.textContent='Press Start when ready.';
+els.phase.textContent='READY';
+els.timer.textContent='15:00';
+</script>
+</body>
+</html>
