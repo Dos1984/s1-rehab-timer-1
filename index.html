@@ -69,6 +69,7 @@
     margin-bottom:16px;
   }
   svg{width:100%;height:100%}
+  .exercise-photo{width:100%;height:100%;object-fit:contain;background:#f8fafc;display:block}
   .phase{
     text-transform:uppercase;
     letter-spacing:.16em;
@@ -165,12 +166,32 @@
 
   <div class="notes">
     <strong>Symptom rule:</strong> stop an exercise if it repeatedly drives pain, tingling or numbness farther down the leg or clearly worsens neurological symptoms.
-    Seek urgent assessment for new bladder/bowel disturbance, saddle numbness, or rapidly progressive weakness.
+    Seek urgent assessment for new bladder/bowel disturbance, saddle numbness, or rapidly progressive weakness.<br><br><strong>Exercise photos:</strong> loaded from external physiotherapy/fitness sources, so an internet connection is required for the photos.
   </div>
 </div>
 
 <script>
 const REST = 15;
+
+
+const photoUrls = {
+  walk: "https://mlf4ooqm0yfc.i.optimole.com/w%3A800/h%3A600/q%3A75/f%3Abest/https%3A/purephysiotherapy.co.uk/wp-content/uploads/2024/09/brisk-walk.png",
+  prone: "https://denverphysicaltherapyathome.com/wp-content/uploads/2022/03/6-LBP-progression-PRONE-ON-ELBOWS-POE-.jpg",
+  pressup: "https://i.ytimg.com/vi/zmT8ZCONkz0/maxresdefault.jpg",
+  slider: "https://nismat.org/wp-content/uploads/2020/07/sciatic-nerve-glide.jpg",
+  bridge: "https://dashboard.supermama.me/photos/94004/5e91097da2f12.jpg",
+  calf: "https://www.physioproperth.com.au/wp-content/uploads/2017/03/Heel-Raise.jpg",
+  bird: "https://www.sterlingphysiotherapy.com/public/assets/images/blogs/physiotherapy-for-back-pain-sleep.webp",
+  squat: "https://assets.bodyspec.com/master/static/96ad7263402ec95f9a0cc2db16c86b3c/b4111/man_performing_bodyweight_squat..jpg"
+};
+
+function exerciseVisual(type){
+  if(type === 'rest') return svgScene('rest');
+  const url = photoUrls[type];
+  if(!url) return svgScene(type);
+  return `<img class="exercise-photo" src="${url}" alt="${type} exercise demonstration" referrerpolicy="no-referrer"
+    onerror="this.outerHTML=svgScene('${type}')">`;
+}
 
 function svgScene(type){
   const head = '<circle cx="220" cy="96" r="24" fill="#0f172a"/>';
@@ -299,7 +320,7 @@ function loadStep(i, announce=false){
   const item=timeline[index];
   remaining=item.sec;
   warned10=false;
-  els.imageWrap.innerHTML=svgScene(item.img);
+  els.imageWrap.innerHTML=exerciseVisual(item.img);
   els.phase.textContent=item.kind==='rest'?'REST':'EXERCISE';
   els.phase.style.color=item.kind==='rest'?'var(--rest)':'var(--accent)';
   els.name.textContent=item.name;
@@ -347,7 +368,7 @@ function tick(){
       els.phase.textContent='COMPLETE';
       els.name.textContent='Session complete';
       els.cue.textContent='Well done. Finish with comfortable movement.';
-      els.imageWrap.innerHTML=svgScene('walk');
+      els.imageWrap.innerHTML=exerciseVisual('walk');
       sessionElapsed=totalDuration();
       updateProgress();
       speak('Session complete.');
