@@ -294,6 +294,8 @@ let motivationOn=true;
 let preferredVoice=null;
 let nextMotivationAt=null;
 let lastMotivationIndex=-1;
+let prompted60=false;
+let prompted30=false;
 
 const els = {
   morningBtn:document.getElementById('morningBtn'),
@@ -351,7 +353,7 @@ function maybeSpeakMotivation(){
   }
 
   // Avoid speaking over the final 10-second warning.
-  if(remaining<=10) return;
+  if(remaining<=10 || (remaining<=62 && remaining>=57) || (remaining<=32 && remaining>=27)) return;
 
   if(remaining<=nextMotivationAt){
     speak(motivationPhrases[Math.floor(Math.random()*motivationPhrases.length)]);
@@ -490,6 +492,8 @@ function loadStep(i, announce=false){
   warned10=false;
   nextMotivationAt=null;
   lastMotivationIndex=-1;
+  prompted60=false;
+  prompted30=false;
   if(item.kind==='rest'){
     const nextEx=nextExerciseAfterRest(index);
     if(nextEx){
@@ -538,7 +542,15 @@ function tick(){
   sessionElapsed++;
   const item=timeline[index];
 
-  maybeSpeakMotivation();
+  if(item.kind==='exercise' && remaining===60 && !prompted60){
+    prompted60=true;
+    speak("You're doing great, just one minute left.");
+  } else if(item.kind==='exercise' && remaining===30 && !prompted30){
+    prompted30=true;
+    speak("Great job, keep going, just thirty seconds left.");
+  } else {
+    maybeSpeakMotivation();
+  }
 
   if(remaining===10 && !warned10){
     warned10=true;
