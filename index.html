@@ -129,6 +129,18 @@
     .controls button{min-width:calc(50% - 5px)}
     .statusrow{font-size:.8rem}
   }
+
+  .exercise-nav{border-top:1px solid #334155;padding:16px 20px 18px}
+  .exercise-nav h3{margin:0 0 10px;font-size:1rem;color:#f8fafc}
+  .exercise-list{display:grid;gap:8px}
+  .exercise-jump{width:100%;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #334155;background:#1e293b;color:#e2e8f0;border-radius:12px;padding:11px 12px;font-weight:700;cursor:pointer}
+  .exercise-jump.current{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.16);background:#0c4a6e}
+  .exercise-jump.completed{border-color:#166534;background:#052e16}
+  .exercise-jump .status{width:24px;height:24px;flex:0 0 24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #64748b;font-size:.9rem;font-weight:900}
+  .exercise-jump.completed .status{background:#22c55e;border-color:#22c55e;color:#052e16}
+  .exercise-jump.current .status{border-color:#7dd3fc;color:#7dd3fc}
+  .exercise-jump .jump-label{flex:1}
+
 </style>
 </head>
 <body>
@@ -162,6 +174,12 @@
     <button id="skipBtn">Skip</button>
     <button class="danger" id="restartBtn">Restart</button>
     <button id="voiceBtn">Voice: On</button>
+  </div>
+
+
+  <div class="exercise-nav">
+    <h3 id="exerciseListTitle">Morning exercise list</h3>
+    <div class="exercise-list" id="exerciseList"></div>
   </div>
 
   <div class="notes">
@@ -268,6 +286,7 @@ let running=false;
 let ticker=null;
 let voiceOn=true;
 let warned10=false;
+let completedExercises=new Set();
 
 const els = {
   morningBtn:document.getElementById('morningBtn'),
@@ -283,8 +302,73 @@ const els = {
   startPause:document.getElementById('startPauseBtn'),
   skip:document.getElementById('skipBtn'),
   restart:document.getElementById('restartBtn'),
-  voice:document.getElementById('voiceBtn')
+  voice:document.getElementById('voiceBtn'),
+  exerciseList:document.getElementById('exerciseList'),
+  exerciseListTitle:document.getElementById('exerciseListTitle')
 };
+
+
+function timelineIndexForExercise(exerciseIndex){
+  let count=-1;
+  for(let i=0;i<timeline.length;i++){
+    if(timeline[i].kind==='exercise'){
+      count++;
+      if(count===exerciseIndex) return i;
+    }
+  }
+  return 0;
+}
+
+function elapsedBeforeTimelineIndex(targetIndex){
+  let total=0;
+  for(let i=0;i<targetIndex;i++) total+=timeline[i].sec;
+  return total;
+}
+
+function currentExerciseNumber(){
+  if(!timeline.length) return 1;
+  return timeline[index].exerciseNumber;
+}
+
+function renderExerciseList(){
+  if(!els.exerciseList) return;
+  const arr=routines[routineKey];
+  els.exerciseListTitle.textContent=`${routineKey==='morning'?'Morning':'Evening'} exercise list`;
+  els.exerciseList.innerHTML='';
+  const currentNum=currentExerciseNumber();
+
+  arr.forEach((ex,i)=>{
+    const num=i+1;
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='exercise-jump';
+    if(completedExercises.has(num)) btn.classList.add('completed');
+    if(currentNum===num && !completedExercises.has(num)) btn.classList.add('current');
+
+    const status=document.createElement('span');
+    status.className='status';
+    status.textContent=completedExercises.has(num)?'✓':(currentNum===num?'▶':'');
+
+    const label=document.createElement('span');
+    label.className='jump-label';
+    label.textContent=`${num}. ${ex.name}`;
+
+    btn.appendChild(status);
+    btn.appendChild(label);
+    btn.addEventListener('click',()=>jumpToExercise(i));
+    els.exerciseList.appendChild(btn);
+  });
+}
+
+function jumpToExercise(exerciseIndex){
+  const target=timelineIndexForExercise(exerciseIndex);
+  sessionElapsed=elapsedBeforeTimelineIndex(target);
+  loadStep(target,true);
+  updateProgress();
+  renderExerciseList();
+  if(!running) els.startPause.textContent='Start';
+  setTimeout(()=>els.imageWrap.scrollIntoView({behavior:'smooth',block:'start'}),50);
+}
 
 function buildTimeline(){
   timeline=[];
@@ -332,6 +416,7 @@ function loadStep(i, announce=false){
     ? `Rest • ${item.cue}`
     : `Exercise ${item.exerciseNumber} of ${exCount}`;
   updateProgress();
+  renderExerciseList();
   if(announce){
     if(item.kind==='rest') speak(`Rest for 15 seconds. ${item.cue}.`);
     else speak(`Next exercise: ${item.name}.`);
@@ -356,6 +441,10 @@ function tick(){
   }
 
   if(remaining<=0){
+    if(item.kind==='exercise'){
+      completedExercises.add(item.exerciseNumber);
+      renderExerciseList();
+    }
     if(index < timeline.length-1){
       loadStep(index+1,true);
     } else {
@@ -411,6 +500,7 @@ function restart(announce=true){
   running=false;
   if(ticker){clearInterval(ticker);ticker=null;}
   sessionElapsed=0;
+  completedExercises.clear();
   buildTimeline();
   loadStep(0,false);
   els.startPause.textContent='Start';
@@ -442,6 +532,7 @@ els.eveningBtn.addEventListener('click',()=>selectRoutine('evening'));
 
 buildTimeline();
 loadStep(0,false);
+renderExerciseList();
 els.name.textContent='Morning routine';
 els.cue.textContent='Press Start when ready.';
 els.phase.textContent='READY';
