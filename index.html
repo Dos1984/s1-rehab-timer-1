@@ -292,7 +292,8 @@ let warned10=false;
 let completedExercises=new Set();
 let motivationOn=true;
 let preferredVoice=null;
-let motivationSpokenThisExercise=false;
+let nextMotivationAt=null;
+let lastMotivationIndex=-1;
 
 const els = {
   morningBtn:document.getElementById('morningBtn'),
@@ -324,21 +325,40 @@ function nextExerciseAfterRest(restIndex){
 }
 
 const motivationPhrases=[
-  "You're doing well.",
-  "Keep it up.",
-  "Nice and steady.",
-  "Good work, keep going.",
-  "Stay controlled, you're doing great.",
-  "Nearly there, keep the movement smooth."
+  "You're doing really well.",
+  "Keep it going, nice and steady.",
+  "Good work. Stay relaxed and keep moving.",
+  "That's it, keep the movement smooth.",
+  "Nice work. Keep your breathing easy.",
+  "You're doing great. Keep the pace comfortable.",
+  "Good control. Keep it up.",
+  "Stay with it, you're doing well.",
+  "Nearly there. Keep it smooth and controlled.",
+  "Great job. Keep going at your own pace."
 ];
 
 function maybeSpeakMotivation(){
-  if(!motivationOn || motivationSpokenThisExercise) return;
+  if(!motivationOn) return;
   const item=timeline[index];
   if(!item || item.kind!=='exercise') return;
-  if(remaining <= Math.max(25, Math.floor(item.sec/2)) && remaining > 15){
-    motivationSpokenThisExercise=true;
+
+  // Initialise a fresh schedule when entering a new exercise.
+  if(lastMotivationIndex!==index || nextMotivationAt===null){
+    lastMotivationIndex=index;
+    // First encouragement after 10-15 seconds of work.
+    const firstDelay=10 + Math.floor(Math.random()*6);
+    nextMotivationAt=item.sec-firstDelay;
+  }
+
+  // Avoid speaking over the final 10-second warning.
+  if(remaining<=10) return;
+
+  if(remaining<=nextMotivationAt){
     speak(motivationPhrases[Math.floor(Math.random()*motivationPhrases.length)]);
+
+    // Next encouragement in another 10-15 seconds.
+    const gap=10 + Math.floor(Math.random()*6);
+    nextMotivationAt=remaining-gap;
   }
 }
 
@@ -426,14 +446,25 @@ function choosePreferredVoice(){
   if(!('speechSynthesis' in window)) return null;
   const voices=speechSynthesis.getVoices();
   if(!voices.length) return null;
-  const maleHints=['daniel','conor','liam','sean','colm','finn','cian','niall','ronan','tom','oliver'];
-  const irish=voices.filter(v => (v.lang||'').toLowerCase().startsWith('en-ie'));
-  preferredVoice=
-    irish.find(v => maleHints.some(h => (v.name||'').toLowerCase().includes(h))) ||
-    irish[0] ||
-    voices.find(v => (v.lang||'').toLowerCase().startsWith('en-gb')) ||
-    voices.find(v => (v.lang||'').toLowerCase().startsWith('en')) ||
-    voices[0];
+
+  const naturalHints=['enhanced','premium','natural','neural'];
+  const maleHints=['daniel','conor','liam','sean','colm','finn','cian','niall','ronan','tom','oliver','aaron'];
+
+  const scoreVoice=(v)=>{
+    const name=(v.name||'').toLowerCase();
+    const lang=(v.lang||'').toLowerCase();
+    let score=0;
+    if(lang.startsWith('en-ie')) score+=100;
+    else if(lang.startsWith('en-gb')) score+=70;
+    else if(lang.startsWith('en')) score+=40;
+
+    if(naturalHints.some(h=>name.includes(h))) score+=25;
+    if(maleHints.some(h=>name.includes(h))) score+=12;
+    if(v.localService) score+=3;
+    return score;
+  };
+
+  preferredVoice=[...voices].sort((a,b)=>scoreVoice(b)-scoreVoice(a))[0] || voices[0];
   return preferredVoice;
 }
 
@@ -444,8 +475,9 @@ function speak(text){
   const u=new SpeechSynthesisUtterance(text);
   if(preferredVoice) u.voice=preferredVoice;
   u.lang=(preferredVoice && preferredVoice.lang) ? preferredVoice.lang : 'en-IE';
-  u.rate=1.0;
-  u.pitch=0.95;
+  u.rate=0.92;
+  u.pitch=0.98;
+  u.volume=1.0;
   speechSynthesis.speak(u);
 }
 
@@ -456,7 +488,8 @@ function loadStep(i, announce=false){
   const item=timeline[index];
   remaining=item.sec;
   warned10=false;
-  motivationSpokenThisExercise=false;
+  nextMotivationAt=null;
+  lastMotivationIndex=-1;
   if(item.kind==='rest'){
     const nextEx=nextExerciseAfterRest(index);
     if(nextEx){
