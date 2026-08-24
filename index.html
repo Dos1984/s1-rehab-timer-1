@@ -141,6 +141,8 @@
   .exercise-jump.current .status{border-color:#7dd3fc;color:#7dd3fc}
   .exercise-jump .jump-label{flex:1}
 
+
+  .rest-prep{margin-top:8px;color:#bbf7d0;font-weight:800;font-size:.95rem}
 </style>
 </head>
 <body>
@@ -174,6 +176,7 @@
     <button id="skipBtn">Skip</button>
     <button class="danger" id="restartBtn">Restart</button>
     <button id="voiceBtn">Voice: On</button>
+    <button id="motivationBtn">Motivation: On</button>
   </div>
 
 
@@ -287,6 +290,9 @@ let ticker=null;
 let voiceOn=true;
 let warned10=false;
 let completedExercises=new Set();
+let motivationOn=true;
+let preferredVoice=null;
+let motivationSpokenThisExercise=false;
 
 const els = {
   morningBtn:document.getElementById('morningBtn'),
@@ -304,9 +310,37 @@ const els = {
   restart:document.getElementById('restartBtn'),
   voice:document.getElementById('voiceBtn'),
   exerciseList:document.getElementById('exerciseList'),
-  exerciseListTitle:document.getElementById('exerciseListTitle')
+  exerciseListTitle:document.getElementById('exerciseListTitle'),
+  motivation:document.getElementById('motivationBtn')
 };
 
+
+
+function nextExerciseAfterRest(restIndex){
+  for(let i=restIndex+1;i<timeline.length;i++){
+    if(timeline[i].kind==='exercise') return timeline[i];
+  }
+  return null;
+}
+
+const motivationPhrases=[
+  "You're doing well.",
+  "Keep it up.",
+  "Nice and steady.",
+  "Good work, keep going.",
+  "Stay controlled, you're doing great.",
+  "Nearly there, keep the movement smooth."
+];
+
+function maybeSpeakMotivation(){
+  if(!motivationOn || motivationSpokenThisExercise) return;
+  const item=timeline[index];
+  if(!item || item.kind!=='exercise') return;
+  if(remaining <= Math.max(25, Math.floor(item.sec/2)) && remaining > 15){
+    motivationSpokenThisExercise=true;
+    speak(motivationPhrases[Math.floor(Math.random()*motivationPhrases.length)]);
+  }
+}
 
 function timelineIndexForExercise(exerciseIndex){
   let count=-1;
@@ -388,12 +422,30 @@ function fmt(s){
   return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
+function choosePreferredVoice(){
+  if(!('speechSynthesis' in window)) return null;
+  const voices=speechSynthesis.getVoices();
+  if(!voices.length) return null;
+  const maleHints=['daniel','conor','liam','sean','colm','finn','cian','niall','ronan','tom','oliver'];
+  const irish=voices.filter(v => (v.lang||'').toLowerCase().startsWith('en-ie'));
+  preferredVoice=
+    irish.find(v => maleHints.some(h => (v.name||'').toLowerCase().includes(h))) ||
+    irish[0] ||
+    voices.find(v => (v.lang||'').toLowerCase().startsWith('en-gb')) ||
+    voices.find(v => (v.lang||'').toLowerCase().startsWith('en')) ||
+    voices[0];
+  return preferredVoice;
+}
+
 function speak(text){
   if(!voiceOn || !('speechSynthesis' in window)) return;
+  if(!preferredVoice) choosePreferredVoice();
   speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text);
-  u.rate=1.02;
-  u.pitch=1;
+  if(preferredVoice) u.voice=preferredVoice;
+  u.lang=(preferredVoice && preferredVoice.lang) ? preferredVoice.lang : 'en-IE';
+  u.rate=1.0;
+  u.pitch=0.95;
   speechSynthesis.speak(u);
 }
 
@@ -404,11 +456,29 @@ function loadStep(i, announce=false){
   const item=timeline[index];
   remaining=item.sec;
   warned10=false;
-  els.imageWrap.innerHTML=exerciseVisual(item.img);
-  els.phase.textContent=item.kind==='rest'?'REST':'EXERCISE';
-  els.phase.style.color=item.kind==='rest'?'var(--rest)':'var(--accent)';
-  els.name.textContent=item.name;
-  els.cue.textContent=item.cue;
+  motivationSpokenThisExercise=false;
+  if(item.kind==='rest'){
+    const nextEx=nextExerciseAfterRest(index);
+    if(nextEx){
+      els.imageWrap.innerHTML=exerciseVisual(nextEx.img);
+      els.phase.textContent='REST • NEXT EXERCISE';
+      els.phase.style.color='var(--rest)';
+      els.name.textContent=`Next: ${nextEx.name}`;
+      els.cue.innerHTML=`${nextEx.cue}<div class="rest-prep">Use this rest to get into position and prepare.</div>`;
+    }else{
+      els.imageWrap.innerHTML=exerciseVisual('walk');
+      els.phase.textContent='REST';
+      els.phase.style.color='var(--rest)';
+      els.name.textContent='Rest';
+      els.cue.textContent='Relax and prepare to finish.';
+    }
+  }else{
+    els.imageWrap.innerHTML=exerciseVisual(item.img);
+    els.phase.textContent='EXERCISE';
+    els.phase.style.color='var(--accent)';
+    els.name.textContent=item.name;
+    els.cue.textContent=item.cue;
+  }
   els.timer.textContent=fmt(remaining);
   els.timer.className='timer'+(item.kind==='rest'?' rest':'');
   const exCount=routines[routineKey].length;
@@ -418,7 +488,7 @@ function loadStep(i, announce=false){
   updateProgress();
   renderExerciseList();
   if(announce){
-    if(item.kind==='rest') speak(`Rest for 15 seconds. ${item.cue}.`);
+    if(item.kind==='rest'){ const nx=nextExerciseAfterRest(index); speak(nx ? `Rest for 15 seconds. Next exercise: ${nx.name}. ${nx.cue}` : 'Rest for 15 seconds.'); }
     else speak(`Next exercise: ${item.name}.`);
   }
 }
@@ -434,6 +504,8 @@ function tick(){
   remaining--;
   sessionElapsed++;
   const item=timeline[index];
+
+  maybeSpeakMotivation();
 
   if(remaining===10 && !warned10){
     warned10=true;
@@ -517,6 +589,18 @@ function selectRoutine(key){
   els.phase.textContent='READY';
   els.timer.textContent='15:00';
 }
+
+
+if('speechSynthesis' in window){
+  choosePreferredVoice();
+  speechSynthesis.onvoiceschanged=choosePreferredVoice;
+}
+
+els.motivation.addEventListener('click',()=>{
+  motivationOn=!motivationOn;
+  els.motivation.textContent=`Motivation: ${motivationOn?'On':'Off'}`;
+  if(motivationOn) speak('Motivational prompts on.');
+});
 
 els.startPause.addEventListener('click',startPause);
 els.skip.addEventListener('click',skip);
