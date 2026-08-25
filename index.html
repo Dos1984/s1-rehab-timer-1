@@ -167,12 +167,15 @@
 
   <div class="progress-track"><div class="progress" id="progress"></div></div>
   <div class="statusrow">
-    <span id="stepLabel">Exercise 1 of 9</span>
+    <span id="stepLabel">Exercise 1 of 11</span>
     <span id="elapsedLabel">Session 00:00 / 20:00</span>
   </div>
 
   <div class="controls">
     <button class="primary" id="startPauseBtn">Start</button>
+    <button id="previousBtn">Previous</button>
+    <button id="back10Btn">Back 10s</button>
+    <button id="forward10Btn">Forward 10s</button>
     <button id="skipBtn">Skip</button>
     <button class="danger" id="restartBtn">Restart</button>
     <button id="voiceBtn">Voice: On</button>
@@ -188,7 +191,7 @@
   <div class="notes">
     <strong>Symptom rule:</strong> stop an exercise if it repeatedly drives pain, tingling or numbness farther down the leg or clearly worsens neurological symptoms.
     Seek urgent assessment for new bladder/bowel disturbance, saddle numbness, or rapidly progressive weakness.<br><br><strong>Exercise photos:</strong> loaded from external physiotherapy/fitness sources, so an internet connection is required for the photos.
-  <br><br><strong>Gluteal strengthening:</strong> both sessions include a 3-minute seated hip-abduction sequence with a mini resistance band: 1 minute upright, 1 minute leaning forward and 1 minute leaning backward. This is followed by 1 minute of crab walking with the band around the knees. The four supplied demonstration images are embedded directly in the app.
+  <br><br><strong>Gluteal strengthening:</strong> both sessions include three separate 1-minute seated hip-abduction exercises with a mini resistance band: upright, leaning forward and leaning backward, with a 10-second rest between each position. This is followed by 1 minute of crab walking with the band around the knees. The four supplied demonstration images are embedded directly in the app.
 </div>
 </div>
 
@@ -272,9 +275,11 @@ const routines = {
     {name:'Sciatic Nerve Slider', sec:90, img:'slider', cue:'Gentle gliding only — do not hold a nerve stretch.'},
     {name:'Bridge', sec:120, img:'bridge', cue:'Lift smoothly, squeeze glutes, lower with control.'},
     {name:'Double-Leg Calf Raises', sec:120, img:'calf', cue:'Rise slowly, pause briefly, lower under control.'},
-    {name:'Seated Hip Abduction with Resistance Band', sec:180, img:'seated_upright', cue:'Band around the knees. Push the knees outward for 3 seconds, then return over 3 seconds. First minute upright, second minute leaning forward, third minute leaning backward.'},
+    {name:'Seated Hip Abduction — Upright', sec:60, img:'seated_upright', restAfter:10, cue:'Sit on the edge of a firm chair with hips higher than knees. Keep both feet flat. Push the knees outward for 3 seconds, then return inward over 3 seconds.'},
+    {name:'Seated Hip Abduction — Leaning Forward', sec:60, img:'seated_forward', restAfter:10, cue:'Lean the trunk forward while keeping both feet flat. Continue the same slow 3-seconds-out, 3-seconds-in rhythm against the band.'},
+    {name:'Seated Hip Abduction — Leaning Backward', sec:60, img:'seated_backward', cue:'Lean the trunk backward with control. Keep tension on the band and continue the same slow outward-and-inward movement.'},
     {name:'Crab Walking with Resistance Band', sec:60, img:'crab_walk', cue:'Band around the knees, feet slightly turned out. Keep tension on the band and take 3–4 sideways steps each way.'},
-    {name:'Easy Walking Finish', sec:180, img:'walk', cue:'Finish with relaxed movement rather than sitting immediately.'}
+    {name:'Easy Walking Finish', sec:160, img:'walk', cue:'Finish with relaxed movement rather than sitting immediately.'}
   ],
   evening: [
     {name:'Comfortable Walking', sec:180, img:'walk', cue:'Easy pace to loosen up before the exercises.'},
@@ -283,9 +288,11 @@ const routines = {
     {name:'Bird-Dog', sec:120, img:'bird', cue:'Keep pelvis level. Use a smaller range if symptoms increase.'},
     {name:'Calf / S1 Strengthening', sec:120, img:'calf', cue:'Use support. Progress toward single-leg work only when comfortable.'},
     {name:'Sit-to-Stand / Shallow Squat', sec:120, img:'squat', cue:'Keep the movement controlled and symptom-free.'},
-    {name:'Seated Hip Abduction with Resistance Band', sec:180, img:'seated_upright', cue:'Band around the knees. Push the knees outward for 3 seconds, then return over 3 seconds. First minute upright, second minute leaning forward, third minute leaning backward.'},
+    {name:'Seated Hip Abduction — Upright', sec:60, img:'seated_upright', restAfter:10, cue:'Sit on the edge of a firm chair with hips higher than knees. Keep both feet flat. Push the knees outward for 3 seconds, then return inward over 3 seconds.'},
+    {name:'Seated Hip Abduction — Leaning Forward', sec:60, img:'seated_forward', restAfter:10, cue:'Lean the trunk forward while keeping both feet flat. Continue the same slow 3-seconds-out, 3-seconds-in rhythm against the band.'},
+    {name:'Seated Hip Abduction — Leaning Backward', sec:60, img:'seated_backward', cue:'Lean the trunk backward with control. Keep tension on the band and continue the same slow outward-and-inward movement.'},
     {name:'Crab Walking with Resistance Band', sec:60, img:'crab_walk', cue:'Band around the knees, feet slightly turned out. Keep tension on the band and take 3–4 sideways steps each way.'},
-    {name:'Relaxed Walking Finish', sec:120, img:'walk', cue:'Cool down with easy movement.'}
+    {name:'Relaxed Walking Finish', sec:100, img:'walk', cue:'Cool down with easy movement.'}
   ]
 };
 
@@ -323,7 +330,10 @@ const els = {
   voice:document.getElementById('voiceBtn'),
   exerciseList:document.getElementById('exerciseList'),
   exerciseListTitle:document.getElementById('exerciseListTitle'),
-  motivation:document.getElementById('motivationBtn')
+  motivation:document.getElementById('motivationBtn'),
+  previous:document.getElementById('previousBtn'),
+  back10:document.getElementById('back10Btn'),
+  forward10:document.getElementById('forward10Btn')
 };
 
 
@@ -349,30 +359,6 @@ const motivationPhrases=[
 ];
 
 
-function updateSeatedAbductionPhase(){
-  const item=timeline[index];
-  if(!item || item.kind!=='exercise' || item.name!=='Seated Hip Abduction with Resistance Band') return;
-
-  let imgKey='seated_upright';
-  let phaseText='Upright position';
-  let detail='Sit on the edge of a firm chair with the hips higher than the knees. Keep both feet flat. Push the knees outward for 3 seconds, then return inward over 3 seconds.';
-
-  if(remaining<=120 && remaining>60){
-    imgKey='seated_forward';
-    phaseText='Leaning forward';
-    detail='Lean the trunk forward while keeping both feet flat. Continue the same slow 3-seconds-out, 3-seconds-in rhythm.';
-  } else if(remaining<=60){
-    imgKey='seated_backward';
-    phaseText='Leaning backward';
-    detail='Lean the trunk backward with control. Keep tension on the band and continue the same slow outward-and-inward movement.';
-  }
-
-  if(item._lastBandPhase!==phaseText){
-    item._lastBandPhase=phaseText;
-    els.imageWrap.innerHTML=exerciseVisual(imgKey);
-    els.cue.innerHTML=`<strong>${phaseText}</strong><br>${detail}`;
-  }
-}
 
 function maybeSpeakMotivation(){
   if(!motivationOn) return;
@@ -466,10 +452,13 @@ function buildTimeline(){
   const arr=routines[routineKey];
   arr.forEach((ex,i)=>{
     timeline.push({kind:'exercise',...ex,exerciseNumber:i+1});
-    if(i<arr.length-1) timeline.push({
-      kind:'rest',name:'Rest',sec:REST,img:'rest',
-      cue:`Next: ${arr[i+1].name}`,exerciseNumber:i+1
-    });
+    if(i<arr.length-1){
+      const restSeconds=Number.isFinite(ex.restAfter) ? ex.restAfter : REST;
+      timeline.push({
+        kind:'rest',name:'Rest',sec:restSeconds,img:'rest',
+        cue:`Next: ${arr[i+1].name}`,exerciseNumber:i+1
+      });
+    }
   });
 }
 
@@ -529,7 +518,6 @@ function loadStep(i, announce=false){
   lastMotivationIndex=-1;
   prompted60=false;
   prompted30=false;
-  item._lastBandPhase=null;
   if(item.kind==='rest'){
     const nextEx=nextExerciseAfterRest(index);
     if(nextEx){
@@ -552,7 +540,6 @@ function loadStep(i, announce=false){
     els.name.textContent=item.name;
     els.cue.textContent=item.cue;
   }
-  updateSeatedAbductionPhase();
   els.timer.textContent=fmt(remaining);
   els.timer.className='timer'+(item.kind==='rest'?' rest':'');
   const exCount=routines[routineKey].length;
@@ -562,7 +549,7 @@ function loadStep(i, announce=false){
   updateProgress();
   renderExerciseList();
   if(announce){
-    if(item.kind==='rest'){ const nx=nextExerciseAfterRest(index); speak(nx ? `Rest for 15 seconds. Next exercise: ${nx.name}. ${nx.cue}` : 'Rest for 15 seconds.'); }
+    if(item.kind==='rest'){ const nx=nextExerciseAfterRest(index); speak(nx ? `Rest for ${item.sec} seconds. Next exercise: ${nx.name}. ${nx.cue}` : `Rest for ${item.sec} seconds.`); }
     else speak(`Next exercise: ${item.name}.`);
   }
 }
@@ -579,14 +566,8 @@ function tick(){
   sessionElapsed++;
   const item=timeline[index];
 
-  updateSeatedAbductionPhase();
 
-  if(item.kind==='exercise' && item.name==='Seated Hip Abduction with Resistance Band' && remaining===120){
-    speak("Great work. Now lean forward for the next minute. Keep both feet flat and continue the slow outward and inward movement.");
-  } else if(item.kind==='exercise' && item.name==='Seated Hip Abduction with Resistance Band' && remaining===60){
-    prompted60=true;
-    speak("You're doing great, just one minute left. Now lean backward and keep the movement slow and controlled.");
-  } else if(item.kind==='exercise' && remaining===60 && !prompted60){
+  if(item.kind==='exercise' && remaining===60 && !prompted60){
     prompted60=true;
     speak("You're doing great, just one minute left.");
   } else if(item.kind==='exercise' && remaining===30 && !prompted30){
@@ -647,6 +628,58 @@ function startPause(){
   }
 }
 
+
+function previousExercise(){
+  // Find the previous exercise in the timeline.
+  let target=index-1;
+  if(timeline[index] && timeline[index].kind==='exercise') target=index-1;
+  for(let i=target;i>=0;i--){
+    if(timeline[i].kind==='exercise'){
+      sessionElapsed=elapsedBeforeTimelineIndex(i);
+      loadStep(i,true);
+      updateProgress();
+      renderExerciseList();
+      return;
+    }
+  }
+  // If already at the first exercise, restart that exercise.
+  sessionElapsed=0;
+  loadStep(0,true);
+  updateProgress();
+}
+
+function seekWithinStep(seconds){
+  const item=timeline[index];
+  if(!item) return;
+
+  if(seconds>0){
+    // Move forward by reducing time remaining.
+    const move=Math.min(seconds, Math.max(0, remaining));
+    remaining-=move;
+    sessionElapsed+=move;
+
+    if(remaining<=0){
+      if(index<timeline.length-1){
+        loadStep(index+1,true);
+      }else{
+        remaining=0;
+      }
+    }
+  }else if(seconds<0){
+    // Move backward, but not earlier than the start of the current step.
+    const maxBack=item.sec-remaining;
+    const move=Math.min(-seconds, Math.max(0,maxBack));
+    remaining+=move;
+    sessionElapsed=Math.max(0,sessionElapsed-move);
+    warned10=remaining<=10;
+    prompted60=remaining<60;
+    prompted30=remaining<30;
+  }
+
+  els.timer.textContent=fmt(remaining);
+  updateProgress();
+}
+
 function skip(){
   if(index<timeline.length-1){
     sessionElapsed += remaining;
@@ -691,6 +724,9 @@ els.motivation.addEventListener('click',()=>{
   if(motivationOn) speak('Motivational prompts on.');
 });
 
+els.previous.addEventListener('click',previousExercise);
+els.back10.addEventListener('click',()=>seekWithinStep(-10));
+els.forward10.addEventListener('click',()=>seekWithinStep(10));
 els.startPause.addEventListener('click',startPause);
 els.skip.addEventListener('click',skip);
 els.restart.addEventListener('click',()=>restart(true));
