@@ -180,6 +180,7 @@
     <button class="danger" id="restartBtn">Restart</button>
     <button id="voiceBtn">Voice: On</button>
     <button id="testVoiceBtn">Test Voice</button>
+    <button id="simpleVoiceBtn">Test Basic iPhone Speech</button>
     <label for="voiceChoice" style="width:100%;font-size:.9rem;color:#cbd5e1">Voice selection</label>
     <select id="voiceChoice" style="width:100%;padding:12px;border-radius:10px;font-size:16px;background:#e4e8f2;color:#152238"><option value="system">System default (recommended test)</option></select>
     <button id="audioBeepBtn">Test Sound (Beep)</button>
@@ -551,20 +552,26 @@ function speak(text){
   const token=++speechToken;
   if(speechRetryTimer)clearTimeout(speechRetryTimer);
   if(voiceStatusTimer)clearTimeout(voiceStatusTimer);
-  // Speak synchronously within the user's tap; delaying speak can break iOS audio activation.
-  try{synth.cancel();synth.resume();}catch(e){}
+  // Avoid cancel() immediately before speak(): some iOS WebKit versions report
+  // onstart but emit no audible audio after this sequence.
+  try{if(synth.paused)synth.resume();}catch(e){}
   const u=new SpeechSynthesisUtterance(text);
   activeUtterance=u;
   const voices=synth.getVoices();
   const manual=selectedVoiceKey!=='system'?voices.find(v=>v.voiceURI===selectedVoiceKey):null;
   if(manual)u.voice=manual;
   // When testing the system default, leave voice unset so iOS chooses its own.
-  u.lang=manual?.lang || 'en-US';
-  u.rate=0.96;u.pitch=1;u.volume=1;
+  if(manual)u.lang=manual.lang;
+  // Do not override the system voice language in automatic mode.
+  u.rate=1;u.pitch=1;u.volume=1;
   u.onstart=()=>{if(token===speechToken)showVoiceStatus('Speaking • '+(u.voice?.name || 'System voice'));};
   u.onend=()=>{if(token===speechToken){showVoiceStatus('Voice ready');activeUtterance=null;}};
   u.onerror=e=>{if(token===speechToken)showVoiceStatus('Voice error: '+(e.error||'unknown')+' — try Test Voice again.');};
   try{
+    if(synth.speaking || synth.pending){
+      // Queueing is safer than cancelling immediately before speak on iOS.
+      showVoiceStatus('Voice queued…');
+    }
     synth.speak(u);
     showVoiceStatus('Starting voice…');
     voiceStatusTimer=setTimeout(()=>{
@@ -808,6 +815,17 @@ els.voice.addEventListener('click',()=>{
 });
 document.getElementById('voiceChoice').addEventListener('change',e=>{selectedVoiceKey=e.target.value;showVoiceStatus('Selected: '+e.target.options[e.target.selectedIndex].text+'. Tap Test Voice.');});
 document.getElementById('audioBeepBtn').addEventListener('click',testAudioBeep);
+document.getElementById('simpleVoiceBtn').addEventListener('click',()=>{
+  if(!('speechSynthesis' in window)){showVoiceStatus('Speech synthesis unavailable');return;}
+  // Intentionally no voice, locale, cancel, resume, or asynchronous delay.
+  const u=new SpeechSynthesisUtterance('Hello. This is a basic speech test.');
+  u.volume=1;u.rate=1;
+  activeUtterance=u;
+  u.onstart=()=>showVoiceStatus('Basic speech started');
+  u.onend=()=>showVoiceStatus('Basic speech finished');
+  u.onerror=e=>showVoiceStatus('Basic speech error: '+e.error);
+  speechSynthesis.speak(u);
+});
 document.getElementById('testVoiceBtn').addEventListener('click',()=>{voiceOn=true; els.voice.textContent='Voice: On'; speak('Voice test. You are doing great. Keep it up!');});
 els.morningBtn.addEventListener('click',()=>selectRoutine('morning'));
 els.eveningBtn.addEventListener('click',()=>selectRoutine('evening'));
