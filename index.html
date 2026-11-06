@@ -878,7 +878,7 @@ els.voice.addEventListener('click',()=>{
 });
 document.getElementById('voiceChoice').addEventListener('change',e=>{selectedVoiceKey=e.target.value;workingVoiceKey=null;silentVoiceKeys.clear();try{localStorage.setItem('s1-preferred-voice',selectedVoiceKey);}catch(err){}showVoiceStatus('Selected: '+e.target.options[e.target.selectedIndex].text+'. Tap Test Voice.');});
 document.getElementById('audioBeepBtn').addEventListener('click',testAudioBeep);
-document.getElementById('simpleVoiceBtn').addEventListener('click',()=>{voiceOn=true;els.voice.textContent='Voice: On';resetVoiceEngine();silentVoiceKeys.clear();workingVoiceKey=null;speak('Hello. This is a basic iPhone speech test.');});
+document.getElementById('simpleVoiceBtn').addEventListener('click',()=>{voiceOn=true;els.voice.textContent='Voice: On';resetVoiceEngine();silentVoiceKeys.clear();workingVoiceKey=null;setTimeout(()=>speak('Hello. This is a basic iPhone speech test.'),250);});
 document.getElementById('testVoiceBtn').addEventListener('click',()=>{voiceOn=true;els.voice.textContent='Voice: On';resetVoiceEngine();silentVoiceKeys.clear();workingVoiceKey=null;setTimeout(()=>speak('Voice test. You are doing great. Keep it up!'),250);});
 els.morningBtn.addEventListener('click',()=>selectRoutine('morning'));
 els.eveningBtn.addEventListener('click',()=>selectRoutine('evening'));
