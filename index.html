@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>S1 Radiculopathy Rehab Timer</title>
+<title>Exercise Programme</title>
 <style>
   :root{
     --bg:#0f172a;
@@ -148,7 +148,7 @@
 <body>
 <div class="app">
   <header>
-    <h1>S1 Radiculopathy Rehab Timer</h1>
+    <h1>Exercise Programme</h1>
     <div class="sub">20-minute guided morning and evening sessions</div>
   </header>
 
@@ -302,542 +302,154 @@ const routines = {
   ]
 };
 
-let routineKey='morning';
-let timeline=[];
-let index=0;
-let remaining=0;
-let sessionElapsed=0;
-let running=false;
-let ticker=null;
-let voiceOn=true;
-let warned10=false;
-let completedExercises=new Set();
-let motivationOn=true;
-let preferredVoice=null;
-let nextMotivationAt=null;
-let lastMotivationIndex=-1;
-let prompted60=false;
-let prompted30=false;
-
-const els = {
-  morningBtn:document.getElementById('morningBtn'),
-  eveningBtn:document.getElementById('eveningBtn'),
-  imageWrap:document.getElementById('imageWrap'),
-  phase:document.getElementById('phaseLabel'),
-  name:document.getElementById('exerciseName'),
-  cue:document.getElementById('cue'),
-  timer:document.getElementById('timer'),
-  progress:document.getElementById('progress'),
-  step:document.getElementById('stepLabel'),
-  elapsed:document.getElementById('elapsedLabel'),
-  startPause:document.getElementById('startPauseBtn'),
-  skip:document.getElementById('skipBtn'),
-  restart:document.getElementById('restartBtn'),
-  voice:document.getElementById('voiceBtn'),
-  exerciseList:document.getElementById('exerciseList'),
-  exerciseListTitle:document.getElementById('exerciseListTitle'),
-  motivation:document.getElementById('motivationBtn'),
-  previous:document.getElementById('previousBtn'),
-  back10:document.getElementById('back10Btn'),
-  forward10:document.getElementById('forward10Btn')
-};
 
 
-
-function nextExerciseAfterRest(restIndex){
-  for(let i=restIndex+1;i<timeline.length;i++){
-    if(timeline[i].kind==='exercise') return timeline[i];
-  }
-  return null;
-}
-
-const motivationPhrases=[
-  "You're doing really well.",
-  "Keep it going, nice and steady.",
-  "Good work. Stay relaxed and keep moving.",
-  "That's it, keep the movement smooth.",
-  "Nice work. Keep your breathing easy.",
-  "You're doing great. Keep the pace comfortable.",
-  "Good control. Keep it up.",
-  "Stay with it, you're doing well.",
-  "Nearly there. Keep it smooth and controlled.",
-  "Great job. Keep going at your own pace."
-];
-
-
-
-function maybeSpeakMotivation(){
-  if(!motivationOn) return;
-  const item=timeline[index];
-  if(!item || item.kind!=='exercise') return;
-
-  // Initialise a fresh schedule when entering a new exercise.
-  if(lastMotivationIndex!==index || nextMotivationAt===null){
-    lastMotivationIndex=index;
-    // First encouragement after 10-15 seconds of work.
-    const firstDelay=10 + Math.floor(Math.random()*6);
-    nextMotivationAt=item.sec-firstDelay;
-  }
-
-  // Avoid speaking over the final 10-second warning.
-  if(remaining<=10 || (remaining<=62 && remaining>=57) || (remaining<=32 && remaining>=27)) return;
-
-  if(remaining<=nextMotivationAt){
-    speak(motivationPhrases[Math.floor(Math.random()*motivationPhrases.length)]);
-
-    // Next encouragement in another 10-15 seconds.
-    const gap=10 + Math.floor(Math.random()*6);
-    nextMotivationAt=remaining-gap;
-  }
-}
-
-function timelineIndexForExercise(exerciseIndex){
-  let count=-1;
-  for(let i=0;i<timeline.length;i++){
-    if(timeline[i].kind==='exercise'){
-      count++;
-      if(count===exerciseIndex) return i;
-    }
-  }
-  return 0;
-}
-
-function elapsedBeforeTimelineIndex(targetIndex){
-  let total=0;
-  for(let i=0;i<targetIndex;i++) total+=timeline[i].sec;
-  return total;
-}
-
-function currentExerciseNumber(){
-  if(!timeline.length) return 1;
-  return timeline[index].exerciseNumber;
-}
-
-function renderExerciseList(){
-  if(!els.exerciseList) return;
-  const arr=routines[routineKey];
-  els.exerciseListTitle.textContent=`${routineKey==='morning'?'Morning':'Evening'} exercise list`;
-  els.exerciseList.innerHTML='';
-  const currentNum=currentExerciseNumber();
-
-  arr.forEach((ex,i)=>{
-    const num=i+1;
-    const btn=document.createElement('button');
-    btn.type='button';
-    btn.className='exercise-jump';
-    if(completedExercises.has(num)) btn.classList.add('completed');
-    if(currentNum===num && !completedExercises.has(num)) btn.classList.add('current');
-
-    const status=document.createElement('span');
-    status.className='status';
-    status.textContent=completedExercises.has(num)?'✓':(currentNum===num?'▶':'');
-
-    const label=document.createElement('span');
-    label.className='jump-label';
-    label.textContent=`${num}. ${ex.name}`;
-
-    btn.appendChild(status);
-    btn.appendChild(label);
-    btn.addEventListener('click',()=>jumpToExercise(i));
-    els.exerciseList.appendChild(btn);
+'use strict';
+const $=id=>document.getElementById(id);
+const ui={image:$('imageWrap'),phase:$('phaseLabel'),name:$('exerciseName'),cue:$('cue'),timer:$('timer'),progress:$('progress'),step:$('stepLabel'),elapsed:$('elapsedLabel'),start:$('startPauseBtn'),voice:$('voiceBtn'),motivation:$('motivationBtn'),list:$('exerciseList'),listTitle:$('exerciseListTitle'),status:$('voiceStatus'),select:$('voiceChoice')};
+let routine='morning',steps=[],pos=0,remaining=0,elapsed=0,running=false,interval=null,voiceEnabled=true,motivationEnabled=true,completed=new Set(),announced=new Set(),nextMotivation=0;
+const fmt=n=>String(Math.floor(Math.max(0,n)/60)).padStart(2,'0')+':'+String(Math.max(0,n)%60).padStart(2,'0');
+const total=()=>steps.reduce((n,s)=>n+s.sec,0);
+const status=s=>{ui.status.textContent=s;};
+function makeSteps(){
+  steps=[];
+  routines[routine].forEach((e,i)=>{
+    steps.push({...e,kind:'exercise',number:i+1});
+    if(i<routines[routine].length-1)steps.push({kind:'rest',name:'Rest',sec:Number.isFinite(e.restAfter)?e.restAfter:REST,number:i+1});
   });
 }
-
-function jumpToExercise(exerciseIndex){
-  const target=timelineIndexForExercise(exerciseIndex);
-  sessionElapsed=elapsedBeforeTimelineIndex(target);
-  loadStep(target,true);
-  updateProgress();
-  renderExerciseList();
-  if(!running) els.startPause.textContent='Start';
-  setTimeout(()=>els.imageWrap.scrollIntoView({behavior:'smooth',block:'start'}),50);
-}
-
-function buildTimeline(){
-  timeline=[];
-  const arr=routines[routineKey];
-  arr.forEach((ex,i)=>{
-    timeline.push({kind:'exercise',...ex,exerciseNumber:i+1});
-    if(i<arr.length-1){
-      const restSeconds=Number.isFinite(ex.restAfter) ? ex.restAfter : REST;
-      timeline.push({
-        kind:'rest',name:'Rest',sec:restSeconds,img:'rest',
-        cue:`Next: ${arr[i+1].name}`,exerciseNumber:i+1
-      });
-    }
+function nextExercise(i){return steps.slice(i+1).find(s=>s.kind==='exercise');}
+function before(i){return steps.slice(0,i).reduce((n,s)=>n+s.sec,0);}
+function renderList(){
+  ui.listTitle.textContent=(routine==='morning'?'Morning':'Evening')+' exercise list';
+  ui.list.replaceChildren();
+  routines[routine].forEach((e,i)=>{
+    const b=document.createElement('button');
+    b.type='button';b.textContent=(completed.has(i+1)?'✓ ':'')+(i+1)+'. '+e.name;
+    b.className=(steps[pos]?.kind==='exercise'&&steps[pos].number===i+1?'active ':'')+(completed.has(i+1)?'completed':'');
+    b.addEventListener('click',()=>{const at=steps.findIndex(s=>s.kind==='exercise'&&s.number===i+1);go(at,true);});
+    ui.list.appendChild(b);
   });
 }
-
-function fmt(s){
-  s=Math.max(0,Math.round(s));
-  const m=Math.floor(s/60), sec=s%60;
-  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+function render(){
+  const s=steps[pos];if(!s)return;
+  const next=s.kind==='rest'?nextExercise(pos):null;
+  ui.image.innerHTML=exerciseVisual(next?.img||s.img||'walk');
+  ui.phase.textContent=s.kind==='rest'?'REST • NEXT EXERCISE':'EXERCISE';
+  ui.phase.style.color=s.kind==='rest'?'var(--rest)':'var(--accent)';
+  ui.name.textContent=next?'Next: '+next.name:s.name;
+  ui.cue.textContent=s.kind==='rest'?(next?next.cue+' Prepare during this rest.':'Rest and prepare.'):s.cue;
+  ui.timer.textContent=fmt(remaining);
+  ui.timer.className='timer'+(s.kind==='rest'?' rest':'')+(remaining<=10&&s.kind==='exercise'?' warn':'');
+  ui.step.textContent=s.kind==='rest'?'Rest • '+s.sec+' seconds':'Exercise '+s.number+' of '+routines[routine].length;
+  ui.elapsed.textContent='Session '+fmt(elapsed)+' / '+fmt(total());
+  ui.progress.style.width=Math.min(100,elapsed/total()*100)+'%';
+  ui.start.textContent=running?'Pause':elapsed>=total()?'Restart':'Start / Resume';
+  $('morningBtn').classList.toggle('active',routine==='morning');
+  $('eveningBtn').classList.toggle('active',routine==='evening');
+  renderList();
 }
-
-function choosePreferredVoice(){
-  if(!('speechSynthesis' in window)) return null;
-  const voices=speechSynthesis.getVoices();
-  if(!voices.length) return null;
-
-  const naturalHints=['enhanced','premium','natural','neural'];
-  const maleHints=['daniel','conor','liam','sean','colm','finn','cian','niall','ronan','tom','oliver','aaron'];
-
-  const scoreVoice=(v)=>{
-    const name=(v.name||'').toLowerCase();
-    const lang=(v.lang||'').toLowerCase();
-    let score=0;
-    if(lang.startsWith('en-ie')) score+=100;
-    else if(lang.startsWith('en-gb')) score+=70;
-    else if(lang.startsWith('en')) score+=40;
-
-    if(naturalHints.some(h=>name.includes(h))) score+=25;
-    if(maleHints.some(h=>name.includes(h))) score+=12;
-    if(v.localService) score+=3;
-    return score;
-  };
-
-  preferredVoice=[...voices].sort((a,b)=>scoreVoice(b)-scoreVoice(a))[0] || voices[0];
-  return preferredVoice;
+function go(i,announce=false){
+  if(i<0||i>=steps.length)return;
+  pos=i;remaining=steps[i].sec;elapsed=before(i);announced.clear();nextMotivation=0;render();
+  if(announce){const s=steps[pos];const next=s.kind==='rest'?nextExercise(pos):null;say(s.kind==='rest'?'Rest for '+s.sec+' seconds. '+(next?'Next exercise: '+next.name+'. '+next.cue:''):'Next exercise: '+s.name+'. '+s.cue);}
 }
-
-let selectedVoiceKey='system';
-function populateVoiceChoices(){
-  const sel=document.getElementById('voiceChoice');
-  if(!sel || !('speechSynthesis' in window))return;
-  const voices=window.speechSynthesis.getVoices();
-  const prev=sel.value||selectedVoiceKey;
-  sel.innerHTML='';
-  const base=document.createElement('option');base.value='system';base.textContent='System default (recommended test)';sel.appendChild(base);
-  voices.filter(v=>/^en[-_]/i.test(v.lang)).sort((a,b)=>a.lang.localeCompare(b.lang)||a.name.localeCompare(b.name)).forEach(v=>{
-    const o=document.createElement('option');o.value=v.voiceURI;o.textContent=v.name+' ('+v.lang+')';sel.appendChild(o);
-  });
-  sel.value=[...sel.options].some(o=>o.value===prev)?prev:'system';
-  selectedVoiceKey=sel.value;
-}
-function testAudioBeep(){
-  const AudioCtx=window.AudioContext||window.webkitAudioContext;
-  if(!AudioCtx){showVoiceStatus('Web Audio is unavailable in this browser.');return;}
-  try{
-    const ctx=new AudioCtx();
-    ctx.resume().then(()=>{
-      const osc=ctx.createOscillator(),gain=ctx.createGain();
-      osc.type='sine';osc.frequency.value=660;
-      gain.gain.value=.15;
-      osc.connect(gain);gain.connect(ctx.destination);
-      osc.start();osc.stop(ctx.currentTime+.4);
-      osc.onended=()=>ctx.close();
-      showVoiceStatus('Beep requested. If silent, check media volume and audio output.');
-    }).catch(e=>showVoiceStatus('Audio test error: '+e.message));
-  }catch(e){showVoiceStatus('Audio test error: '+e.message);}
-}
-let activeUtterance=null;
-let speechToken=0;
-let speechRetryTimer=null;
-let voiceStatusTimer=null;
-function showVoiceStatus(message){
-  const el=document.getElementById('voiceStatus');
-  if(el) el.textContent=message;
-}
-function unlockSpeech(){
-  if(!('speechSynthesis' in window)) {showVoiceStatus('Speech synthesis is not available in this browser.');return;}
-  try{window.speechSynthesis.resume();}catch(e){}
-}
-function speak(text){
-  if(!voiceOn) return;
-  if(!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)){
-    showVoiceStatus('Voice playback is unavailable in this browser. Open in Safari.');
-    return;
-  }
-  const synth=window.speechSynthesis;
-  const token=++speechToken;
-  if(speechRetryTimer)clearTimeout(speechRetryTimer);
-  if(voiceStatusTimer)clearTimeout(voiceStatusTimer);
-  // Avoid cancel() immediately before speak(): some iOS WebKit versions report
-  // onstart but emit no audible audio after this sequence.
-  try{if(synth.paused)synth.resume();}catch(e){}
-  const u=new SpeechSynthesisUtterance(text);
-  activeUtterance=u;
-  const voices=synth.getVoices();
-  const manual=selectedVoiceKey!=='system'?voices.find(v=>v.voiceURI===selectedVoiceKey):null;
-  if(manual)u.voice=manual;
-  // When testing the system default, leave voice unset so iOS chooses its own.
-  if(manual)u.lang=manual.lang;
-  // Do not override the system voice language in automatic mode.
-  u.rate=1;u.pitch=1;u.volume=1;
-  u.onstart=()=>{if(token===speechToken)showVoiceStatus('Speaking • '+(u.voice?.name || 'System voice'));};
-  u.onend=()=>{if(token===speechToken){showVoiceStatus('Voice ready');activeUtterance=null;}};
-  u.onerror=e=>{if(token===speechToken)showVoiceStatus('Voice error: '+(e.error||'unknown')+' — try Test Voice again.');};
-  try{
-    if(synth.speaking || synth.pending){
-      // Queueing is safer than cancelling immediately before speak on iOS.
-      showVoiceStatus('Voice queued…');
-    }
-    synth.speak(u);
-    showVoiceStatus('Starting voice…');
-    voiceStatusTimer=setTimeout(()=>{
-      if(token===speechToken && !synth.speaking && !synth.pending){
-        showVoiceStatus('No audio started. Check silent mode, volume, and Safari voice settings; tap Test Voice again.');
-      }
-    },1800);
-  }catch(e){showVoiceStatus('Voice failed: '+e.message);}
-}
-
-function totalDuration(){ return timeline.reduce((a,b)=>a+b.sec,0); }
-
-function loadStep(i, announce=false){
-  index=i;
-  const item=timeline[index];
-  remaining=item.sec;
-  warned10=false;
-  nextMotivationAt=null;
-  lastMotivationIndex=-1;
-  prompted60=false;
-  prompted30=false;
-  if(item.kind==='rest'){
-    const nextEx=nextExerciseAfterRest(index);
-    if(nextEx){
-      els.imageWrap.innerHTML=exerciseVisual(nextEx.img);
-      els.phase.textContent='REST • NEXT EXERCISE';
-      els.phase.style.color='var(--rest)';
-      els.name.textContent=`Next: ${nextEx.name}`;
-      els.cue.innerHTML=`${nextEx.cue}<div class="rest-prep">Use this rest to check the picture, get into position and prepare.</div>`;
-    }else{
-      els.imageWrap.innerHTML=exerciseVisual('walk');
-      els.phase.textContent='REST';
-      els.phase.style.color='var(--rest)';
-      els.name.textContent='Rest';
-      els.cue.textContent='Relax and prepare to finish.';
-    }
-  }else{
-    els.imageWrap.innerHTML=exerciseVisual(item.img);
-    els.phase.textContent='EXERCISE';
-    els.phase.style.color='var(--accent)';
-    els.name.textContent=item.name;
-    els.cue.textContent=item.cue;
-  }
-  els.timer.textContent=fmt(remaining);
-  els.timer.className='timer'+(item.kind==='rest'?' rest':'');
-  const exCount=routines[routineKey].length;
-  els.step.textContent=item.kind==='rest'
-    ? `Rest • ${item.cue}`
-    : `Exercise ${item.exerciseNumber} of ${exCount}`;
-  updateProgress();
-  renderExerciseList();
-  if(announce){
-    if(item.kind==='rest'){ const nx=nextExerciseAfterRest(index); speak(nx ? `Rest for ${item.sec} seconds. Next exercise: ${nx.name}. ${nx.cue}` : `Rest for ${item.sec} seconds.`); }
-    else speak(`Next exercise: ${item.name}.`);
-  }
-}
-
-function updateProgress(){
-  const total=totalDuration();
-  els.elapsed.textContent=`Session ${fmt(sessionElapsed)} / ${fmt(total)}`;
-  els.progress.style.width=`${Math.min(100,(sessionElapsed/total)*100)}%`;
-}
-
-function tick(){
-  if(!running) return;
-  if(voiceOn && 'speechSynthesis' in window && speechSynthesis.paused) speechSynthesis.resume();
-  remaining--;
-  sessionElapsed++;
-  const item=timeline[index];
-
-
-  if(item.kind==='exercise' && remaining===60 && !prompted60){
-    prompted60=true;
-    speak("You're doing great, just one minute left.");
-  } else if(item.kind==='exercise' && remaining===30 && !prompted30){
-    prompted30=true;
-    speak("Great job, keep going, just thirty seconds left.");
-  } else {
-    maybeSpeakMotivation();
-  }
-
-  if(remaining===10 && !warned10){
-    warned10=true;
-    speak('10 seconds remaining.');
-  }
-
-  if(remaining<=0){
-    if(item.kind==='exercise'){
-      completedExercises.add(item.exerciseNumber);
-      renderExerciseList();
-    }
-    if(index < timeline.length-1){
-      loadStep(index+1,true);
-    } else {
-      running=false;
-      clearInterval(ticker);
-      ticker=null;
-      remaining=0;
-      els.timer.textContent='00:00';
-      els.startPause.textContent='Start';
-      els.phase.textContent='COMPLETE';
-      els.name.textContent='Session complete';
-      els.cue.textContent='Well done. Finish with comfortable movement.';
-      els.imageWrap.innerHTML=exerciseVisual('walk');
-      sessionElapsed=totalDuration();
-      updateProgress();
-      speak('Session complete.');
-      return;
-    }
-  }
-
-  els.timer.textContent=fmt(remaining);
-  els.timer.className='timer'+(item.kind==='rest'?' rest':'')+(remaining<=10 && item.kind!=='rest'?' warn':'');
-  updateProgress();
-}
-
-function startPause(){
-  if(!running){
-    if(sessionElapsed>=totalDuration()) restart(false);
-    running=true;
-    unlockSpeech();
-    els.startPause.textContent='Pause';
-    const item=timeline[index];
-    speak(item.kind==='rest' ? 'Rest.' : `Begin ${item.name}.`);
-    ticker=setInterval(tick,1000);
-  }else{
-    running=false;
-    els.startPause.textContent='Resume';
-    clearInterval(ticker); ticker=null;
-    speak('Paused.');
-  }
-}
-
-
-function previousExercise(){
-  // Find the previous exercise in the timeline.
-  let target=index-1;
-  if(timeline[index] && timeline[index].kind==='exercise') target=index-1;
-  for(let i=target;i>=0;i--){
-    if(timeline[i].kind==='exercise'){
-      sessionElapsed=elapsedBeforeTimelineIndex(i);
-      loadStep(i,true);
-      updateProgress();
-      renderExerciseList();
-      return;
-    }
-  }
-  // If already at the first exercise, restart that exercise.
-  sessionElapsed=0;
-  loadStep(0,true);
-  updateProgress();
-}
-
-function seekWithinStep(seconds){
-  const item=timeline[index];
-  if(!item) return;
-
-  if(seconds>0){
-    // Move forward by reducing time remaining.
-    const move=Math.min(seconds, Math.max(0, remaining));
-    remaining-=move;
-    sessionElapsed+=move;
-
-    if(remaining<=0){
-      if(index<timeline.length-1){
-        loadStep(index+1,true);
-      }else{
-        remaining=0;
-      }
-    }
-  }else if(seconds<0){
-    // Move backward, but not earlier than the start of the current step.
-    const maxBack=item.sec-remaining;
-    const move=Math.min(-seconds, Math.max(0,maxBack));
-    remaining+=move;
-    sessionElapsed=Math.max(0,sessionElapsed-move);
-    warned10=remaining<=10;
-    prompted60=remaining<60;
-    prompted30=remaining<30;
-  }
-
-  els.timer.textContent=fmt(remaining);
-  updateProgress();
-}
-
-function skip(){
-  if(index<timeline.length-1){
-    sessionElapsed += remaining;
-    loadStep(index+1,true);
-  } else {
-    sessionElapsed=totalDuration();
-    tick();
-  }
-}
-
-function restart(announce=true){
-  running=false;
-  if(ticker){clearInterval(ticker);ticker=null;}
-  sessionElapsed=0;
-  completedExercises.clear();
-  buildTimeline();
-  loadStep(0,false);
-  els.startPause.textContent='Start';
-  if(announce) speak('Session reset.');
-}
-
 function selectRoutine(key){
-  routineKey=key;
-  els.morningBtn.classList.toggle('active',key==='morning');
-  els.eveningBtn.classList.toggle('active',key==='evening');
-  restart(false);
-  els.name.textContent=key==='morning'?'Morning routine':'Evening routine';
-  els.cue.textContent='Press Start when ready.';
-  els.phase.textContent='READY';
-  els.timer.textContent='20:00';
+  pause(false);routine=key;completed.clear();makeSteps();pos=0;remaining=steps[0].sec;elapsed=0;announced.clear();render();ui.phase.textContent='READY';ui.name.textContent=key==='morning'?'Morning routine':'Evening routine';ui.cue.textContent='Press Start when ready.';ui.timer.textContent='20:00';ui.start.textContent='Start';
 }
-
-
-if('speechSynthesis' in window){
-  choosePreferredVoice();
-  speechSynthesis.onvoiceschanged=()=>{choosePreferredVoice();populateVoiceChoices();};
+function pause(announce=false){running=false;if(interval!==null){clearInterval(interval);interval=null;}render();if(announce)say('Paused.');}
+function start(){
+  if(running){pause(true);return;}
+  if(elapsed>=total())selectRoutine(routine);
+  running=true;render();say('Begin '+steps[pos].name+'. '+(steps[pos].cue||''));interval=setInterval(tick,1000);
 }
+const phrases=["You're doing really well.","Keep it going, nice and steady.","Good work. Stay relaxed and keep moving.","Nice work. Keep your breathing easy.","Great job. Keep it up."];
+function tick(){
+  if(!running)return;
+  const s=steps[pos];remaining=Math.max(0,remaining-1);elapsed=Math.min(total(),elapsed+1);
+  if(s.kind==='exercise'){
+    if(remaining===60&&!announced.has('60')){announced.add('60');say("You're doing great. One minute remaining.");}
+    if(remaining===30&&!announced.has('30')){announced.add('30');say('Thirty seconds remaining.');}
+    if(motivationEnabled&&remaining>12&&remaining!==60&&remaining!==30&&remaining<=nextMotivation){say(phrases[Math.floor(Math.random()*phrases.length)]);nextMotivation=remaining-25;}
+  }
+  if(remaining===10&&!announced.has('10')){announced.add('10');say('Ten seconds remaining.');}
+  if(remaining===0){
+    if(s.kind==='exercise')completed.add(s.number);
+    if(pos+1<steps.length){pos++;remaining=steps[pos].sec;announced.clear();nextMotivation=Math.max(15,remaining-25);render();const n=steps[pos];const following=n.kind==='rest'?nextExercise(pos):null;say(n.kind==='rest'?'Rest for '+n.sec+' seconds. '+(following?'Next: '+following.name+'. '+following.cue:''):'Next exercise: '+n.name+'. '+n.cue);}
+    else{pause(false);elapsed=total();ui.phase.textContent='COMPLETE';ui.name.textContent='Session complete';ui.cue.textContent='Well done. Finish with comfortable movement.';ui.timer.textContent='00:00';say('Session complete. Well done.');return;}
+  }
+  render();
+}
+function shift(seconds){
+  if(seconds<0){const move=Math.min(-seconds,steps[pos].sec-remaining);remaining+=move;elapsed=Math.max(0,elapsed-move);}
+  else{const move=Math.min(seconds,remaining);remaining-=move;elapsed=Math.min(total(),elapsed+move);if(remaining===0&&pos<steps.length-1){pos++;remaining=steps[pos].sec;announced.clear();say('Next: '+steps[pos].name+'.');}}
+  render();
+}
+function previous(){const current=steps[pos];let i=pos-1;while(i>=0&&steps[i].kind!=='exercise')i--;if(i<0)i=0;go(i,true);}
+function skip(){if(pos<steps.length-1)go(pos+1,true);else{pause(false);elapsed=total();render();}}
+function restart(){pause(false);selectRoutine(routine);}
+let utterance=null,voiceGeneration=0;
+function voices(){try{return speechSynthesis.getVoices()||[];}catch(e){return [];}}
+function fillVoices(){
+  if(!('speechSynthesis' in window))return;
+  const previous=ui.select.value||'system';ui.select.replaceChildren();
+  const option=(v,label)=>{const o=document.createElement('option');o.value=v;o.textContent=label;ui.select.appendChild(o);};
+  option('system','iPhone default voice');
+  voices().filter(v=>/^en([_-]|$)/i.test(v.lang)).forEach(v=>option(v.voiceURI,v.name+' ('+v.lang+')'));
+  ui.select.value=[...ui.select.options].some(o=>o.value===previous)?previous:'system';
+}
+function say(text){
+  if(!voiceEnabled)return;
+  if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){status('Speech unavailable in this browser');return;}
+  const synth=window.speechSynthesis,gen=++voiceGeneration;
+  try{
+    // A single new request. No AudioSession override and no forced resume/cancel cycle.
+    if(synth.speaking||synth.pending)synth.cancel();
+    const u=new SpeechSynthesisUtterance(text);utterance=u;
+    const selected=voices().find(v=>v.voiceURI===ui.select.value);
+    if(selected){u.voice=selected;u.lang=selected.lang;}
+    u.rate=1;u.pitch=1;u.volume=1;
+    u.onstart=()=>{if(gen===voiceGeneration)status('Speech started: '+(u.voice?.name||'iPhone default'));};
+    u.onend=()=>{if(gen===voiceGeneration){status('Speech completed');utterance=null;}};
+    u.onerror=e=>{if(gen===voiceGeneration)status('Speech error: '+(e.error||'unknown'));};
+    synth.speak(u);status('Speech requested…');
+    setTimeout(()=>{if(gen===voiceGeneration&&utterance===u&&!(synth.speaking||synth.pending))status('Speech request did not start');},1800);
+  }catch(e){status('Speech failed: '+e.message);}
+}
+// An independent HTML audio test: does not use Web Audio, the speech engine,
+// or an audio session override. A small WAV is generated locally in memory.
+let beepAudio=null;
+function beep(){
+  try{
+    const rate=22050,duration=.35,samples=Math.floor(rate*duration),bytes=new Uint8Array(44+samples*2),view=new DataView(bytes.buffer);
+    const write=(p,t)=>{for(let i=0;i<t.length;i++)bytes[p+i]=t.charCodeAt(i);};
+    write(0,'RIFF');view.setUint32(4,36+samples*2,true);write(8,'WAVE');write(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,samples*2,true);
+    for(let i=0;i<samples;i++){const fade=Math.min(1,i/350,(samples-i)/1100);view.setInt16(44+i*2,Math.round(9000*fade*Math.sin(2*Math.PI*660*i/rate)),true);}
+    const blob=new Blob([bytes],{type:'audio/wav'}),url=URL.createObjectURL(blob);
+    if(beepAudio){beepAudio.pause();beepAudio=null;}
+    beepAudio=new Audio(url);beepAudio.volume=1;
+    beepAudio.onended=()=>{URL.revokeObjectURL(url);status('Sound test finished');};
+    beepAudio.onerror=()=>status('Sound test could not play');
+    const p=beepAudio.play();status('Playing sound test…');
+    if(p&&p.catch)p.catch(e=>status('Sound test blocked: '+e.message));
+  }catch(e){status('Sound test failed: '+e.message);}
+}
+$('morningBtn').addEventListener('click',()=>selectRoutine('morning'));
+$('eveningBtn').addEventListener('click',()=>selectRoutine('evening'));
+ui.start.addEventListener('click',start);
+$('previousBtn').addEventListener('click',previous);
+$('back10Btn').addEventListener('click',()=>shift(-10));
+$('forward10Btn').addEventListener('click',()=>shift(10));
+$('skipBtn').addEventListener('click',skip);
+$('restartBtn').addEventListener('click',restart);
+ui.voice.addEventListener('click',()=>{voiceEnabled=!voiceEnabled;ui.voice.textContent='Voice: '+(voiceEnabled?'On':'Off');if(voiceEnabled)say('Voice prompts on.');else{++voiceGeneration;if('speechSynthesis' in window)speechSynthesis.cancel();}});
+ui.motivation.addEventListener('click',()=>{motivationEnabled=!motivationEnabled;ui.motivation.textContent='Motivation: '+(motivationEnabled?'On':'Off');});
+$('testVoiceBtn').addEventListener('click',()=>{voiceEnabled=true;ui.voice.textContent='Voice: On';say('Hello. This is your exercise programme. Your voice instructions are ready.');});
+$('simpleVoiceBtn').addEventListener('click',()=>{voiceEnabled=true;ui.voice.textContent='Voice: On';say('Hello from your iPhone.');});
+$('audioBeepBtn').addEventListener('click',beep);
+if('speechSynthesis' in window)speechSynthesis.addEventListener?.('voiceschanged',fillVoices);
+fillVoices();selectRoutine('morning');
 
-els.motivation.addEventListener('click',()=>{
-  motivationOn=!motivationOn;
-  els.motivation.textContent=`Motivation: ${motivationOn?'On':'Off'}`;
-  if(motivationOn) speak('Motivational prompts on.');
-});
-
-els.previous.addEventListener('click',previousExercise);
-els.back10.addEventListener('click',()=>seekWithinStep(-10));
-els.forward10.addEventListener('click',()=>seekWithinStep(10));
-els.startPause.addEventListener('click',startPause);
-els.skip.addEventListener('click',skip);
-els.restart.addEventListener('click',()=>restart(true));
-els.voice.addEventListener('click',()=>{
-  voiceOn=!voiceOn;
-  els.voice.textContent=`Voice: ${voiceOn?'On':'Off'}`;
-  if(voiceOn){ unlockSpeech(); speak('Voice prompts on.'); }
-  else if('speechSynthesis' in window){ ++speechToken; clearTimeout(speechRetryTimer); speechSynthesis.cancel(); }
-});
-document.getElementById('voiceChoice').addEventListener('change',e=>{selectedVoiceKey=e.target.value;showVoiceStatus('Selected: '+e.target.options[e.target.selectedIndex].text+'. Tap Test Voice.');});
-document.getElementById('audioBeepBtn').addEventListener('click',testAudioBeep);
-document.getElementById('simpleVoiceBtn').addEventListener('click',()=>{
-  if(!('speechSynthesis' in window)){showVoiceStatus('Speech synthesis unavailable');return;}
-  // Intentionally no voice, locale, cancel, resume, or asynchronous delay.
-  const u=new SpeechSynthesisUtterance('Hello. This is a basic speech test.');
-  u.volume=1;u.rate=1;
-  activeUtterance=u;
-  u.onstart=()=>showVoiceStatus('Basic speech started');
-  u.onend=()=>showVoiceStatus('Basic speech finished');
-  u.onerror=e=>showVoiceStatus('Basic speech error: '+e.error);
-  speechSynthesis.speak(u);
-});
-document.getElementById('testVoiceBtn').addEventListener('click',()=>{voiceOn=true; els.voice.textContent='Voice: On'; speak('Voice test. You are doing great. Keep it up!');});
-els.morningBtn.addEventListener('click',()=>selectRoutine('morning'));
-els.eveningBtn.addEventListener('click',()=>selectRoutine('evening'));
-
-populateVoiceChoices();
-buildTimeline();
-loadStep(0,false);
-renderExerciseList();
-els.name.textContent='Morning routine';
-els.cue.textContent='Press Start when ready.';
-els.phase.textContent='READY';
-els.timer.textContent='20:00';
 </script>
 </body>
 </html>
