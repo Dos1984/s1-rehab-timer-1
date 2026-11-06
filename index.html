@@ -1,208 +1,4 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Exercise Programme</title>
-<style>
-  :root{
-    --bg:#0f172a;
-    --panel:#111827;
-    --text:#f8fafc;
-    --muted:#cbd5e1;
-    --accent:#38bdf8;
-    --warn:#f59e0b;
-    --rest:#22c55e;
-    --danger:#ef4444;
-  }
-  *{box-sizing:border-box}
-  body{
-    margin:0;
-    min-height:100vh;
-    background:linear-gradient(180deg,#0f172a,#020617);
-    color:var(--text);
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:18px;
-  }
-  .app{
-    width:min(760px,100%);
-    background:rgba(17,24,39,.96);
-    border:1px solid #334155;
-    border-radius:24px;
-    overflow:hidden;
-    box-shadow:0 20px 60px rgba(0,0,0,.4);
-  }
-  header{padding:18px 20px 10px;text-align:center}
-  h1{font-size:clamp(1.35rem,3vw,2rem);margin:0 0 6px}
-  .sub{color:var(--muted);font-size:.95rem}
-  .selector{
-    display:flex; gap:10px; padding:12px 20px 4px;
-  }
-  .selector button,.controls button{
-    flex:1;
-    border:0;
-    border-radius:14px;
-    padding:12px 14px;
-    font-weight:700;
-    cursor:pointer;
-  }
-  .selector button{
-    background:#1e293b;color:#e2e8f0;border:1px solid #334155;
-  }
-  .selector button.active{background:var(--accent);color:#082f49}
-  .stage{
-    padding:18px 20px 8px;
-    text-align:center;
-  }
-  .image-wrap{
-    width:100%;
-    aspect-ratio:16/9;
-    background:#f8fafc;
-    border-radius:18px;
-    overflow:hidden;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    margin-bottom:16px;
-  }
-  svg{width:100%;height:100%}
-  .exercise-photo{width:100%;height:100%;object-fit:contain;background:#f8fafc;display:block}
-  .phase{
-    text-transform:uppercase;
-    letter-spacing:.16em;
-    color:var(--accent);
-    font-size:.8rem;
-    font-weight:800;
-  }
-  .exercise{
-    font-size:clamp(1.5rem,4vw,2.4rem);
-    margin:8px 0 6px;
-    font-weight:800;
-  }
-  .cue{color:var(--muted);min-height:2.8em}
-  .timer{
-    font-variant-numeric:tabular-nums;
-    font-size:clamp(4.2rem,15vw,8rem);
-    line-height:1;
-    font-weight:900;
-    margin:14px 0 8px;
-  }
-  .timer.warn{color:var(--warn)}
-  .timer.rest{color:var(--rest)}
-  .progress-track{
-    height:10px;
-    background:#1e293b;
-    border-radius:999px;
-    overflow:hidden;
-    margin:10px 20px;
-  }
-  .progress{height:100%;width:0;background:var(--accent);transition:width .3s linear}
-  .statusrow{
-    display:flex;
-    justify-content:space-between;
-    gap:12px;
-    padding:8px 20px 14px;
-    color:var(--muted);
-    font-size:.92rem;
-  }
-  .controls{
-    display:flex;
-    gap:10px;
-    padding:0 20px 20px;
-    flex-wrap:wrap;
-  }
-  .controls button{background:#e2e8f0;color:#0f172a;min-width:120px}
-  .controls .primary{background:var(--accent);color:#082f49}
-  .controls .danger{background:#fecaca;color:#7f1d1d}
-  .notes{
-    border-top:1px solid #334155;
-    padding:14px 20px 18px;
-    color:#cbd5e1;
-    font-size:.88rem;
-    line-height:1.45;
-  }
-  .notes strong{color:white}
-  @media (max-width:520px){
-    .controls button{min-width:calc(50% - 5px)}
-    .statusrow{font-size:.8rem}
-  }
-
-  .exercise-nav{border-top:1px solid #334155;padding:16px 20px 18px}
-  .exercise-nav h3{margin:0 0 10px;font-size:1rem;color:#f8fafc}
-  .exercise-list{display:grid;gap:8px}
-  .exercise-jump{width:100%;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #334155;background:#1e293b;color:#e2e8f0;border-radius:12px;padding:11px 12px;font-weight:700;cursor:pointer}
-  .exercise-jump.current{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.16);background:#0c4a6e}
-  .exercise-jump.completed{border-color:#166534;background:#052e16}
-  .exercise-jump .status{width:24px;height:24px;flex:0 0 24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #64748b;font-size:.9rem;font-weight:900}
-  .exercise-jump.completed .status{background:#22c55e;border-color:#22c55e;color:#052e16}
-  .exercise-jump.current .status{border-color:#7dd3fc;color:#7dd3fc}
-  .exercise-jump .jump-label{flex:1}
-
-
-  .rest-prep{margin-top:8px;color:#bbf7d0;font-weight:800;font-size:.95rem}
-</style>
-</head>
-<body>
-<div class="app">
-  <header>
-    <h1>Exercise Programme</h1>
-    <div class="sub">20-minute guided morning and evening sessions</div>
-  </header>
-
-  <div class="selector">
-    <button id="morningBtn" class="active">Morning</button>
-    <button id="eveningBtn">Evening</button>
-  </div>
-
-  <div class="stage">
-    <div class="image-wrap" id="imageWrap"></div>
-    <div class="phase" id="phaseLabel">READY</div>
-    <div class="exercise" id="exerciseName">Morning routine</div>
-    <div class="cue" id="cue">Press Start when ready.</div>
-    <div class="timer" id="timer">20:00</div>
-  </div>
-
-  <div class="progress-track"><div class="progress" id="progress"></div></div>
-  <div class="statusrow">
-    <span id="stepLabel">Exercise 1 of 11</span>
-    <span id="elapsedLabel">Session 00:00 / 20:00</span>
-  </div>
-
-  <div class="controls">
-    <button class="primary" id="startPauseBtn">Start</button>
-    <button id="previousBtn">Previous</button>
-    <button id="back10Btn">Back 10s</button>
-    <button id="forward10Btn">Forward 10s</button>
-    <button id="skipBtn">Skip</button>
-    <button class="danger" id="restartBtn">Restart</button>
-    <button id="voiceBtn">Voice: On</button>
-    <button id="testVoiceBtn">Test Voice</button>
-    <button id="simpleVoiceBtn">Test Basic iPhone Speech</button>
-    <label for="voiceChoice" style="width:100%;font-size:.9rem;color:#cbd5e1">Voice selection</label>
-    <select id="voiceChoice" style="width:100%;padding:12px;border-radius:10px;font-size:16px;background:#e4e8f2;color:#152238"><option value="system">System default (recommended test)</option></select>
-    <button id="audioBeepBtn">Test Sound (Beep)</button>
-    <button id="motivationBtn">Motivation: On</button>
-  </div>
-
-
-  <div id="voiceStatus" role="status" aria-live="polite" style="font-size:.9rem;color:#cbd5e1;margin:8px 0 12px">Tap Test Voice to check audio.</div>
-<div class="exercise-nav">
-    <h3 id="exerciseListTitle">Morning exercise list</h3>
-    <div class="exercise-list" id="exerciseList"></div>
-  </div>
-
-  <div class="notes">
-    <strong>Symptom rule:</strong> stop an exercise if it repeatedly drives pain, tingling or numbness farther down the leg or clearly worsens neurological symptoms.
-    Seek urgent assessment for new bladder/bowel disturbance, saddle numbness, or rapidly progressive weakness.<br><br><strong>Exercise photos:</strong> loaded from external physiotherapy/fitness sources, so an internet connection is required for the photos.
-  <br><br><strong>Gluteal strengthening:</strong> both sessions include three separate 1-minute seated hip-abduction exercises with a mini resistance band: upright, leaning forward and leaning backward, with a 10-second rest between each position. This is followed by 1 minute of crab walking with the band around the knees. The four supplied demonstration images are embedded directly in the app.
-</div>
-</div>
-
-<script>
-const REST = 15;
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Exercise Programme</title><style>:root{color-scheme:dark;--bg:#091225;--card:#142238;--fg:#f4f8ff;--muted:#b6c7da;--blue:#48c4ff;--green:#54e3a2}*{box-sizing:border-box}body{margin:0;background:linear-gradient(#101d35,#060b17);font:16px system-ui,-apple-system,sans-serif;color:var(--fg)}main{max-width:740px;margin:auto;padding:18px}h1{font-size:1.65rem;margin:0 0 5px}p{color:var(--muted);line-height:1.5}.panel{background:var(--card);border:1px solid #30415a;border-radius:16px;padding:16px;margin:14px 0}.buttons{display:flex;gap:9px;flex-wrap:wrap;margin:10px 0}button,select{font:inherit;border:1px solid #51637a;border-radius:10px;padding:12px 14px;background:#223755;color:white;cursor:pointer}button.primary,button.active{background:#0869b4;border-color:#58c8ff}button:focus-visible,select:focus-visible{outline:3px solid var(--blue)}#picture{height:245px;display:grid;place-items:center;background:#e8edf3;border-radius:12px;overflow:hidden}#picture img,#picture svg{max-height:100%;max-width:100%;object-fit:contain}#clock{font-size:clamp(4rem,17vw,6rem);font-weight:800;text-align:center;font-variant-numeric:tabular-nums;margin:10px 0}#phase{text-transform:uppercase;letter-spacing:.12em;color:var(--green)}#name{font-size:1.4rem;margin:8px 0}#cue{color:var(--muted);min-height:2.5em}progress{width:100%;height:14px;accent-color:var(--blue)}#list{display:grid;grid-template-columns:1fr;gap:6px}#list button{text-align:left;padding:10px}#status{font-size:.9rem;overflow-wrap:anywhere;color:#bce7ff}select{width:100%}.small{font-size:.88rem;color:var(--muted)}@media(min-width:560px){#list{grid-template-columns:1fr 1fr}}</style></head><body><main><header><h1>Exercise Programme</h1><p>Guided morning and evening S1 rehabilitation routines · 20 minutes each</p></header><section class="panel"><div class="buttons"><button id="morning" class="active">Morning</button><button id="evening">Evening</button></div><div id="picture" aria-label="Exercise demonstration"></div><p id="phase">READY</p><h2 id="name">Morning routine</h2><p id="cue">Press Start when ready.</p><div id="clock" role="timer">20:00</div><progress id="progress" value="0" max="1200"></progress><p id="elapsed">Session 00:00 / 20:00</p></section><section class="panel"><div class="buttons"><button id="start" class="primary">Start</button><button id="previous">Previous exercise</button><button id="back">Back 10s</button><button id="forward">Forward 10s</button><button id="skip">Skip</button><button id="restart">Restart</button></div><div class="buttons"><button id="voice">Voice: On</button><button id="motivation">Motivation: On</button><button id="testVoice">Test Voice</button><button id="testBeep">Test Sound (Beep)</button></div><label for="choice">Voice selection</label><select id="choice"><option value="system">iPhone system default</option></select><p id="status" role="status" aria-live="polite">Ready for audio testing.</p></section><section class="panel"><h2>Exercise navigator</h2><div id="list"></div></section><section class="panel small"><strong>Symptom guidance:</strong> Stop exercises that cause increasing leg pain, tingling, numbness or weakness. Seek urgent medical assessment for new bladder or bowel dysfunction, saddle numbness or rapidly worsening weakness.</section></main><script>const REST = 15;
 
 
 const photoUrls = {
@@ -305,151 +101,99 @@ const routines = {
 
 
 'use strict';
-const $=id=>document.getElementById(id);
-const ui={image:$('imageWrap'),phase:$('phaseLabel'),name:$('exerciseName'),cue:$('cue'),timer:$('timer'),progress:$('progress'),step:$('stepLabel'),elapsed:$('elapsedLabel'),start:$('startPauseBtn'),voice:$('voiceBtn'),motivation:$('motivationBtn'),list:$('exerciseList'),listTitle:$('exerciseListTitle'),status:$('voiceStatus'),select:$('voiceChoice')};
-let routine='morning',steps=[],pos=0,remaining=0,elapsed=0,running=false,interval=null,voiceEnabled=true,motivationEnabled=true,completed=new Set(),announced=new Set(),nextMotivation=0;
-const fmt=n=>String(Math.floor(Math.max(0,n)/60)).padStart(2,'0')+':'+String(Math.max(0,n)%60).padStart(2,'0');
-const total=()=>steps.reduce((n,s)=>n+s.sec,0);
-const status=s=>{ui.status.textContent=s;};
-function makeSteps(){
-  steps=[];
-  routines[routine].forEach((e,i)=>{
-    steps.push({...e,kind:'exercise',number:i+1});
-    if(i<routines[routine].length-1)steps.push({kind:'rest',name:'Rest',sec:Number.isFinite(e.restAfter)?e.restAfter:REST,number:i+1});
-  });
+const el=id=>document.getElementById(id);
+const U={picture:el('picture'),clock:el('clock'),phase:el('phase'),name:el('name'),cue:el('cue'),progress:el('progress'),elapsed:el('elapsed'),list:el('list'),status:el('status'),voice:el('voice'),motivation:el('motivation'),start:el('start'),choice:el('choice')};
+let mode='morning',plan=[],index=0,left=0,elapsed=0,running=false,timer=null,voiceOn=true,motivationOn=true,done=new Set(),flags=new Set(),lastEncouragement=0;
+const format=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+const length=()=>plan.reduce((n,s)=>n+s.sec,0);
+const notice=s=>U.status.textContent=s;
+function assemble(){
+ plan=[];routines[mode].forEach((x,i)=>{plan.push({...x,type:'exercise',number:i+1});if(i<routines[mode].length-1)plan.push({type:'rest',sec:Number.isFinite(x.restAfter)?x.restAfter:REST,number:i+1,name:'Rest'});});
 }
-function nextExercise(i){return steps.slice(i+1).find(s=>s.kind==='exercise');}
-function before(i){return steps.slice(0,i).reduce((n,s)=>n+s.sec,0);}
-function renderList(){
-  ui.listTitle.textContent=(routine==='morning'?'Morning':'Evening')+' exercise list';
-  ui.list.replaceChildren();
-  routines[routine].forEach((e,i)=>{
-    const b=document.createElement('button');
-    b.type='button';b.textContent=(completed.has(i+1)?'✓ ':'')+(i+1)+'. '+e.name;
-    b.className=(steps[pos]?.kind==='exercise'&&steps[pos].number===i+1?'active ':'')+(completed.has(i+1)?'completed':'');
-    b.addEventListener('click',()=>{const at=steps.findIndex(s=>s.kind==='exercise'&&s.number===i+1);go(at,true);});
-    ui.list.appendChild(b);
-  });
+function upcoming(i){return plan.slice(i+1).find(x=>x.type==='exercise');}
+function offset(i){return plan.slice(0,i).reduce((n,s)=>n+s.sec,0);}
+function paint(){
+ const s=plan[index],next=s.type==='rest'?upcoming(index):null;
+ U.picture.innerHTML=exerciseVisual(next?.img||s.img||'walk');
+ U.phase.textContent=s.type==='rest'?'REST':'EXERCISE '+s.number+' OF '+routines[mode].length;
+ U.name.textContent=next?'Next: '+next.name:s.name;
+ U.cue.textContent=s.type==='rest'?(next?'Get ready: '+next.cue:'Prepare for the next exercise.'):s.cue;
+ U.clock.textContent=format(left);U.elapsed.textContent='Session '+format(elapsed)+' / '+format(length());
+ U.progress.max=length();U.progress.value=elapsed;U.start.textContent=running?'Pause':elapsed>=length()?'Restart':'Start / Resume';
+ el('morning').classList.toggle('active',mode==='morning');el('evening').classList.toggle('active',mode==='evening');
+ U.list.replaceChildren();
+ routines[mode].forEach((x,i)=>{const b=document.createElement('button');b.textContent=(done.has(i+1)?'✓ ':'')+(i+1)+'. '+x.name;if(s.type==='exercise'&&s.number===i+1)b.classList.add('active');b.onclick=()=>jump(plan.findIndex(y=>y.type==='exercise'&&y.number===i+1));U.list.appendChild(b);});
 }
-function render(){
-  const s=steps[pos];if(!s)return;
-  const next=s.kind==='rest'?nextExercise(pos):null;
-  ui.image.innerHTML=exerciseVisual(next?.img||s.img||'walk');
-  ui.phase.textContent=s.kind==='rest'?'REST • NEXT EXERCISE':'EXERCISE';
-  ui.phase.style.color=s.kind==='rest'?'var(--rest)':'var(--accent)';
-  ui.name.textContent=next?'Next: '+next.name:s.name;
-  ui.cue.textContent=s.kind==='rest'?(next?next.cue+' Prepare during this rest.':'Rest and prepare.'):s.cue;
-  ui.timer.textContent=fmt(remaining);
-  ui.timer.className='timer'+(s.kind==='rest'?' rest':'')+(remaining<=10&&s.kind==='exercise'?' warn':'');
-  ui.step.textContent=s.kind==='rest'?'Rest • '+s.sec+' seconds':'Exercise '+s.number+' of '+routines[routine].length;
-  ui.elapsed.textContent='Session '+fmt(elapsed)+' / '+fmt(total());
-  ui.progress.style.width=Math.min(100,elapsed/total()*100)+'%';
-  ui.start.textContent=running?'Pause':elapsed>=total()?'Restart':'Start / Resume';
-  $('morningBtn').classList.toggle('active',routine==='morning');
-  $('eveningBtn').classList.toggle('active',routine==='evening');
-  renderList();
-}
-function go(i,announce=false){
-  if(i<0||i>=steps.length)return;
-  pos=i;remaining=steps[i].sec;elapsed=before(i);announced.clear();nextMotivation=0;render();
-  if(announce){const s=steps[pos];const next=s.kind==='rest'?nextExercise(pos):null;say(s.kind==='rest'?'Rest for '+s.sec+' seconds. '+(next?'Next exercise: '+next.name+'. '+next.cue:''):'Next exercise: '+s.name+'. '+s.cue);}
-}
-function selectRoutine(key){
-  pause(false);routine=key;completed.clear();makeSteps();pos=0;remaining=steps[0].sec;elapsed=0;announced.clear();render();ui.phase.textContent='READY';ui.name.textContent=key==='morning'?'Morning routine':'Evening routine';ui.cue.textContent='Press Start when ready.';ui.timer.textContent='20:00';ui.start.textContent='Start';
-}
-function pause(announce=false){running=false;if(interval!==null){clearInterval(interval);interval=null;}render();if(announce)say('Paused.');}
-function start(){
-  if(running){pause(true);return;}
-  if(elapsed>=total())selectRoutine(routine);
-  running=true;render();say('Begin '+steps[pos].name+'. '+(steps[pos].cue||''));interval=setInterval(tick,1000);
-}
-const phrases=["You're doing really well.","Keep it going, nice and steady.","Good work. Stay relaxed and keep moving.","Nice work. Keep your breathing easy.","Great job. Keep it up."];
+function jump(i){if(i<0||i>=plan.length)return;index=i;left=plan[i].sec;elapsed=offset(i);flags.clear();lastEncouragement=0;paint();const s=plan[i],n=s.type==='rest'?upcoming(i):null;say(s.type==='rest'?'Rest for '+s.sec+' seconds. Next: '+(n?.name||'finish'):'Next exercise: '+s.name+'. '+s.cue);}
+function choose(m){stop();mode=m;assemble();done.clear();index=0;left=plan[0].sec;elapsed=0;flags.clear();paint();U.phase.textContent='READY';U.name.textContent=m==='morning'?'Morning routine':'Evening routine';U.cue.textContent='Press Start when ready.';U.start.textContent='Start';}
+function stop(){running=false;if(timer!==null){clearInterval(timer);timer=null;}}
+function toggle(){if(running){stop();paint();say('Paused.');return;}if(elapsed>=length())choose(mode);running=true;paint();say('Begin '+plan[index].name+'. '+(plan[index].cue||''));timer=setInterval(tick,1000);}
+const encouragement=["You're doing well. Keep going.","Good work. Stay relaxed.","Nice and steady. Keep breathing.","Great job. Keep the movement controlled."];
 function tick(){
-  if(!running)return;
-  const s=steps[pos];remaining=Math.max(0,remaining-1);elapsed=Math.min(total(),elapsed+1);
-  if(s.kind==='exercise'){
-    if(remaining===60&&!announced.has('60')){announced.add('60');say("You're doing great. One minute remaining.");}
-    if(remaining===30&&!announced.has('30')){announced.add('30');say('Thirty seconds remaining.');}
-    if(motivationEnabled&&remaining>12&&remaining!==60&&remaining!==30&&remaining<=nextMotivation){say(phrases[Math.floor(Math.random()*phrases.length)]);nextMotivation=remaining-25;}
-  }
-  if(remaining===10&&!announced.has('10')){announced.add('10');say('Ten seconds remaining.');}
-  if(remaining===0){
-    if(s.kind==='exercise')completed.add(s.number);
-    if(pos+1<steps.length){pos++;remaining=steps[pos].sec;announced.clear();nextMotivation=Math.max(15,remaining-25);render();const n=steps[pos];const following=n.kind==='rest'?nextExercise(pos):null;say(n.kind==='rest'?'Rest for '+n.sec+' seconds. '+(following?'Next: '+following.name+'. '+following.cue:''):'Next exercise: '+n.name+'. '+n.cue);}
-    else{pause(false);elapsed=total();ui.phase.textContent='COMPLETE';ui.name.textContent='Session complete';ui.cue.textContent='Well done. Finish with comfortable movement.';ui.timer.textContent='00:00';say('Session complete. Well done.');return;}
-  }
-  render();
+ if(!running)return;
+ const s=plan[index];left=Math.max(0,left-1);elapsed=Math.min(length(),elapsed+1);
+ if(s.type==='exercise'){
+  if(left===60&&!flags.has('60')){flags.add('60');say('One minute remaining.');}
+  if(left===30&&!flags.has('30')){flags.add('30');say('Thirty seconds remaining.');}
+  if(motivationOn&&left>12&&left%25===0&&left!==60&&left!==30&&left!==lastEncouragement){lastEncouragement=left;say(encouragement[Math.floor(Math.random()*encouragement.length)]);}
+ }
+ if(left===10&&!flags.has('10')){flags.add('10');say('Ten seconds remaining.');}
+ if(left===0){if(s.type==='exercise')done.add(s.number);if(index<plan.length-1){index++;left=plan[index].sec;flags.clear();const n=plan[index],next=n.type==='rest'?upcoming(index):null;say(n.type==='rest'?'Rest for '+n.sec+' seconds. Next: '+(next?.name||'finish'):'Next exercise: '+n.name+'. '+n.cue);}
+ else{stop();elapsed=length();paint();U.phase.textContent='COMPLETE';U.name.textContent='Session complete';say('Session complete. Well done.');return;}}
+ paint();
 }
-function shift(seconds){
-  if(seconds<0){const move=Math.min(-seconds,steps[pos].sec-remaining);remaining+=move;elapsed=Math.max(0,elapsed-move);}
-  else{const move=Math.min(seconds,remaining);remaining-=move;elapsed=Math.min(total(),elapsed+move);if(remaining===0&&pos<steps.length-1){pos++;remaining=steps[pos].sec;announced.clear();say('Next: '+steps[pos].name+'.');}}
-  render();
+function adjust(seconds){const amount=seconds<0?Math.min(-seconds,plan[index].sec-left):Math.min(seconds,left);left+=seconds<0?amount:-amount;elapsed+=seconds<0?-amount:amount;if(left===0&&index<plan.length-1){index++;left=plan[index].sec;flags.clear();say('Next: '+plan[index].name);}paint();}
+function previous(){let i=index-1;while(i>0&&plan[i].type!=='exercise')i--;jump(Math.max(0,i));}
+function skip(){if(index<plan.length-1)jump(index+1);else{stop();elapsed=length();paint();}}
+let currentSpeech=null,speechSequence=0;
+function speechVoices(){try{return speechSynthesis.getVoices()||[];}catch(e){return [];}}
+function populateVoices(){
+ if(!('speechSynthesis' in window))return;
+ const prior=U.choice.value||'system';U.choice.replaceChildren();
+ const add=(key,label)=>{const o=document.createElement('option');o.value=key;o.textContent=label;U.choice.appendChild(o);};
+ add('system','iPhone system default');
+ speechVoices().filter(v=>/^en(?:-|_|$)/i.test(v.lang)).forEach(v=>add(v.voiceURI,v.name+' ('+v.lang+')'));
+ U.choice.value=[...U.choice.options].some(o=>o.value===prior)?prior:'system';
 }
-function previous(){const current=steps[pos];let i=pos-1;while(i>=0&&steps[i].kind!=='exercise')i--;if(i<0)i=0;go(i,true);}
-function skip(){if(pos<steps.length-1)go(pos+1,true);else{pause(false);elapsed=total();render();}}
-function restart(){pause(false);selectRoutine(routine);}
-let utterance=null,voiceGeneration=0;
-function voices(){try{return speechSynthesis.getVoices()||[];}catch(e){return [];}}
-function fillVoices(){
-  if(!('speechSynthesis' in window))return;
-  const previous=ui.select.value||'system';ui.select.replaceChildren();
-  const option=(v,label)=>{const o=document.createElement('option');o.value=v;o.textContent=label;ui.select.appendChild(o);};
-  option('system','iPhone default voice');
-  voices().filter(v=>/^en([_-]|$)/i.test(v.lang)).forEach(v=>option(v.voiceURI,v.name+' ('+v.lang+')'));
-  ui.select.value=[...ui.select.options].some(o=>o.value===previous)?previous:'system';
+function say(words){
+ if(!voiceOn)return;
+ if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){notice('Speech synthesis unavailable');return;}
+ const id=++speechSequence,synth=speechSynthesis;
+ try{
+  if(synth.pending||synth.speaking)synth.cancel();
+  const utterance=new SpeechSynthesisUtterance(words);currentSpeech=utterance;
+  const v=speechVoices().find(v=>v.voiceURI===U.choice.value);
+  if(v){utterance.voice=v;utterance.lang=v.lang;}
+  utterance.rate=1;utterance.volume=1;
+  utterance.onstart=()=>{if(id===speechSequence)notice('Voice started: '+(v?.name||'system default'));};
+  utterance.onend=()=>{if(id===speechSequence){currentSpeech=null;notice('Voice finished');}};
+  utterance.onerror=e=>{if(id===speechSequence)notice('Voice error: '+(e.error||'unknown'));};
+  synth.speak(utterance);notice('Requesting speech…');
+ }catch(e){notice('Voice error: '+e.message);}
 }
-function say(text){
-  if(!voiceEnabled)return;
-  if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){status('Speech unavailable in this browser');return;}
-  const synth=window.speechSynthesis,gen=++voiceGeneration;
-  try{
-    // A single new request. No AudioSession override and no forced resume/cancel cycle.
-    if(synth.speaking||synth.pending)synth.cancel();
-    const u=new SpeechSynthesisUtterance(text);utterance=u;
-    const selected=voices().find(v=>v.voiceURI===ui.select.value);
-    if(selected){u.voice=selected;u.lang=selected.lang;}
-    u.rate=1;u.pitch=1;u.volume=1;
-    u.onstart=()=>{if(gen===voiceGeneration)status('Speech started: '+(u.voice?.name||'iPhone default'));};
-    u.onend=()=>{if(gen===voiceGeneration){status('Speech completed');utterance=null;}};
-    u.onerror=e=>{if(gen===voiceGeneration)status('Speech error: '+(e.error||'unknown'));};
-    synth.speak(u);status('Speech requested…');
-    setTimeout(()=>{if(gen===voiceGeneration&&utterance===u&&!(synth.speaking||synth.pending))status('Speech request did not start');},1800);
-  }catch(e){status('Speech failed: '+e.message);}
-}
-// An independent HTML audio test: does not use Web Audio, the speech engine,
-// or an audio session override. A small WAV is generated locally in memory.
-let beepAudio=null;
+// Web Audio test: construct oscillator and start it synchronously in the tap.
+let soundContext=null;
 function beep(){
-  try{
-    const rate=22050,duration=.35,samples=Math.floor(rate*duration),bytes=new Uint8Array(44+samples*2),view=new DataView(bytes.buffer);
-    const write=(p,t)=>{for(let i=0;i<t.length;i++)bytes[p+i]=t.charCodeAt(i);};
-    write(0,'RIFF');view.setUint32(4,36+samples*2,true);write(8,'WAVE');write(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,samples*2,true);
-    for(let i=0;i<samples;i++){const fade=Math.min(1,i/350,(samples-i)/1100);view.setInt16(44+i*2,Math.round(9000*fade*Math.sin(2*Math.PI*660*i/rate)),true);}
-    const blob=new Blob([bytes],{type:'audio/wav'}),url=URL.createObjectURL(blob);
-    if(beepAudio){beepAudio.pause();beepAudio=null;}
-    beepAudio=new Audio(url);beepAudio.volume=1;
-    beepAudio.onended=()=>{URL.revokeObjectURL(url);status('Sound test finished');};
-    beepAudio.onerror=()=>status('Sound test could not play');
-    const p=beepAudio.play();status('Playing sound test…');
-    if(p&&p.catch)p.catch(e=>status('Sound test blocked: '+e.message));
-  }catch(e){status('Sound test failed: '+e.message);}
+ try{
+  const Context=window.AudioContext||window.webkitAudioContext;
+  if(!Context){notice('AudioContext unavailable');return;}
+  if(!soundContext)soundContext=new Context();
+  const osc=soundContext.createOscillator(),gain=soundContext.createGain();
+  osc.type='sine';osc.frequency.value=700;
+  gain.gain.setValueAtTime(0.18,soundContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001,soundContext.currentTime+0.55);
+  osc.connect(gain);gain.connect(soundContext.destination);
+  osc.start();osc.stop(soundContext.currentTime+0.56);
+  if(soundContext.state==='suspended')soundContext.resume().then(()=>notice('Sound test: '+soundContext.state)).catch(e=>notice('Audio error: '+e.message));
+  else notice('Sound test playing ('+soundContext.state+')');
+ }catch(e){notice('Sound error: '+e.message);}
 }
-$('morningBtn').addEventListener('click',()=>selectRoutine('morning'));
-$('eveningBtn').addEventListener('click',()=>selectRoutine('evening'));
-ui.start.addEventListener('click',start);
-$('previousBtn').addEventListener('click',previous);
-$('back10Btn').addEventListener('click',()=>shift(-10));
-$('forward10Btn').addEventListener('click',()=>shift(10));
-$('skipBtn').addEventListener('click',skip);
-$('restartBtn').addEventListener('click',restart);
-ui.voice.addEventListener('click',()=>{voiceEnabled=!voiceEnabled;ui.voice.textContent='Voice: '+(voiceEnabled?'On':'Off');if(voiceEnabled)say('Voice prompts on.');else{++voiceGeneration;if('speechSynthesis' in window)speechSynthesis.cancel();}});
-ui.motivation.addEventListener('click',()=>{motivationEnabled=!motivationEnabled;ui.motivation.textContent='Motivation: '+(motivationEnabled?'On':'Off');});
-$('testVoiceBtn').addEventListener('click',()=>{voiceEnabled=true;ui.voice.textContent='Voice: On';say('Hello. This is your exercise programme. Your voice instructions are ready.');});
-$('simpleVoiceBtn').addEventListener('click',()=>{voiceEnabled=true;ui.voice.textContent='Voice: On';say('Hello from your iPhone.');});
-$('audioBeepBtn').addEventListener('click',beep);
-if('speechSynthesis' in window)speechSynthesis.addEventListener?.('voiceschanged',fillVoices);
-fillVoices();selectRoutine('morning');
-
-</script>
-</body>
-</html>
+el('morning').onclick=()=>choose('morning');el('evening').onclick=()=>choose('evening');
+U.start.onclick=toggle;el('previous').onclick=previous;el('back').onclick=()=>adjust(-10);el('forward').onclick=()=>adjust(10);el('skip').onclick=skip;el('restart').onclick=()=>choose(mode);
+U.voice.onclick=()=>{voiceOn=!voiceOn;U.voice.textContent='Voice: '+(voiceOn?'On':'Off');if(voiceOn)say('Voice prompts enabled');else{++speechSequence;if('speechSynthesis' in window)speechSynthesis.cancel();}};
+U.motivation.onclick=()=>{motivationOn=!motivationOn;U.motivation.textContent='Motivation: '+(motivationOn?'On':'Off');};
+el('testVoice').onclick=()=>{voiceOn=true;U.voice.textContent='Voice: On';say('Hello. Your exercise programme voice is ready.');};
+el('testBeep').onclick=beep;
+if('speechSynthesis' in window)speechSynthesis.addEventListener?.('voiceschanged',populateVoices);
+populateVoices();choose('morning');
+</script></body></html>
