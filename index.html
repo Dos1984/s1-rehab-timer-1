@@ -184,7 +184,8 @@
   </div>
 
 
-  <div class="exercise-nav">
+  <div id="voiceStatus" role="status" aria-live="polite" style="font-size:.9rem;color:#cbd5e1;margin:8px 0 12px">Tap Test Voice to check audio.</div>
+<div class="exercise-nav">
     <h3 id="exerciseListTitle">Morning exercise list</h3>
     <div class="exercise-list" id="exerciseList"></div>
   </div>
@@ -498,37 +499,48 @@ function choosePreferredVoice(){
 let activeUtterance=null;
 let speechToken=0;
 let speechRetryTimer=null;
-
-function unlockSpeech(){
-  if(!('speechSynthesis' in window)) return;
-  try{
-    speechSynthesis.resume();
-    // iOS Safari may require speech to be initiated by a direct tap.
-    const u=new SpeechSynthesisUtterance(' ');
-    u.volume=0;
-    speechSynthesis.speak(u);
-  }catch(e){ console.warn('Speech unlock:',e); }
+let voiceStatusTimer=null;
+function showVoiceStatus(message){
+  const el=document.getElementById('voiceStatus');
+  if(el) el.textContent=message;
 }
-
+function unlockSpeech(){
+  if(!('speechSynthesis' in window)) {showVoiceStatus('Speech synthesis is not available in this browser.');return;}
+  try{window.speechSynthesis.resume();}catch(e){}
+}
 function speak(text){
-  if(!voiceOn || !('speechSynthesis' in window)) return;
+  if(!voiceOn) return;
+  if(!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)){
+    showVoiceStatus('Voice playback is unavailable in this browser. Open in Safari.');
+    return;
+  }
   const synth=window.speechSynthesis;
-  if(!preferredVoice) choosePreferredVoice();
   const token=++speechToken;
-  if(speechRetryTimer) clearTimeout(speechRetryTimer);
-  try{ synth.cancel(); synth.resume(); }catch(e){}
-  // Safari sometimes drops a new utterance when cancel and speak occur in the same turn.
-  speechRetryTimer=setTimeout(()=>{
-    if(token!==speechToken || !voiceOn) return;
-    const u=new SpeechSynthesisUtterance(text);
-    activeUtterance=u; // retain reference for Safari
-    if(preferredVoice) u.voice=preferredVoice;
-    u.lang=preferredVoice?.lang || 'en-IE';
-    u.rate=0.94; u.pitch=1; u.volume=1;
-    u.onerror=e=>{ console.warn('Voice prompt error:',e.error); };
-    u.onend=()=>{ if(activeUtterance===u) activeUtterance=null; };
-    try{ synth.resume(); synth.speak(u); }catch(e){console.warn('Voice playback failed:',e);}
-  },100);
+  if(speechRetryTimer)clearTimeout(speechRetryTimer);
+  if(voiceStatusTimer)clearTimeout(voiceStatusTimer);
+  // Speak synchronously within the user's tap; delaying speak can break iOS audio activation.
+  try{synth.cancel();synth.resume();}catch(e){}
+  const u=new SpeechSynthesisUtterance(text);
+  activeUtterance=u;
+  const voices=synth.getVoices();
+  if(!preferredVoice || (voices.length && !voices.some(v=>v.name===preferredVoice.name))){
+    choosePreferredVoice();
+  }
+  if(preferredVoice)u.voice=preferredVoice;
+  u.lang=preferredVoice?.lang || 'en-IE';
+  u.rate=0.96;u.pitch=1;u.volume=1;
+  u.onstart=()=>{if(token===speechToken)showVoiceStatus('Speaking • '+(u.voice?.name || 'System voice'));};
+  u.onend=()=>{if(token===speechToken){showVoiceStatus('Voice ready');activeUtterance=null;}};
+  u.onerror=e=>{if(token===speechToken)showVoiceStatus('Voice error: '+(e.error||'unknown')+' — try Test Voice again.');};
+  try{
+    synth.speak(u);
+    showVoiceStatus('Starting voice…');
+    voiceStatusTimer=setTimeout(()=>{
+      if(token===speechToken && !synth.speaking && !synth.pending){
+        showVoiceStatus('No audio started. Check silent mode, volume, and Safari voice settings; tap Test Voice again.');
+      }
+    },1800);
+  }catch(e){showVoiceStatus('Voice failed: '+e.message);}
 }
 
 function totalDuration(){ return timeline.reduce((a,b)=>a+b.sec,0); }
@@ -762,7 +774,7 @@ els.voice.addEventListener('click',()=>{
   if(voiceOn){ unlockSpeech(); speak('Voice prompts on.'); }
   else if('speechSynthesis' in window){ ++speechToken; clearTimeout(speechRetryTimer); speechSynthesis.cancel(); }
 });
-document.getElementById('testVoiceBtn').addEventListener('click',()=>{voiceOn=true; els.voice.textContent='Voice: On'; unlockSpeech(); speak('Voice test. You are doing great. Keep it up!');});
+document.getElementById('testVoiceBtn').addEventListener('click',()=>{voiceOn=true; els.voice.textContent='Voice: On'; speak('Voice test. You are doing great. Keep it up!');});
 els.morningBtn.addEventListener('click',()=>selectRoutine('morning'));
 els.eveningBtn.addEventListener('click',()=>selectRoutine('evening'));
 
