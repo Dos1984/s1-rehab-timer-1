@@ -1,4 +1,208 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Exercise Programme</title><style>:root{color-scheme:dark;--bg:#091225;--card:#142238;--fg:#f4f8ff;--muted:#b6c7da;--blue:#48c4ff;--green:#54e3a2}*{box-sizing:border-box}body{margin:0;background:linear-gradient(#101d35,#060b17);font:16px system-ui,-apple-system,sans-serif;color:var(--fg)}main{max-width:740px;margin:auto;padding:18px}h1{font-size:1.65rem;margin:0 0 5px}p{color:var(--muted);line-height:1.5}.panel{background:var(--card);border:1px solid #30415a;border-radius:16px;padding:16px;margin:14px 0}.buttons{display:flex;gap:9px;flex-wrap:wrap;margin:10px 0}button,select{font:inherit;border:1px solid #51637a;border-radius:10px;padding:12px 14px;background:#223755;color:white;cursor:pointer}button.primary,button.active{background:#0869b4;border-color:#58c8ff}button:focus-visible,select:focus-visible{outline:3px solid var(--blue)}#picture{height:245px;display:grid;place-items:center;background:#e8edf3;border-radius:12px;overflow:hidden}#picture img,#picture svg{max-height:100%;max-width:100%;object-fit:contain}#clock{font-size:clamp(4rem,17vw,6rem);font-weight:800;text-align:center;font-variant-numeric:tabular-nums;margin:10px 0}#phase{text-transform:uppercase;letter-spacing:.12em;color:var(--green)}#name{font-size:1.4rem;margin:8px 0}#cue{color:var(--muted);min-height:2.5em}progress{width:100%;height:14px;accent-color:var(--blue)}#list{display:grid;grid-template-columns:1fr;gap:6px}#list button{text-align:left;padding:10px}#status{font-size:.9rem;overflow-wrap:anywhere;color:#bce7ff}select{width:100%}.small{font-size:.88rem;color:var(--muted)}@media(min-width:560px){#list{grid-template-columns:1fr 1fr}}</style></head><body><main><header><h1>Exercise Programme</h1><p>Guided morning and evening S1 rehabilitation routines · 20 minutes each</p></header><section class="panel"><div class="buttons"><button id="morning" class="active">Morning</button><button id="evening">Evening</button></div><div id="picture" aria-label="Exercise demonstration"></div><p id="phase">READY</p><h2 id="name">Morning routine</h2><p id="cue">Press Start when ready.</p><div id="clock" role="timer">20:00</div><progress id="progress" value="0" max="1200"></progress><p id="elapsed">Session 00:00 / 20:00</p></section><section class="panel"><div class="buttons"><button id="start" class="primary">Start</button><button id="previous">Previous exercise</button><button id="back">Back 10s</button><button id="forward">Forward 10s</button><button id="skip">Skip</button><button id="restart">Restart</button></div><div class="buttons"><button id="voice">Voice: On</button><button id="motivation">Motivation: On</button><button id="testVoice">Test Voice</button><button id="testBeep">Test Sound (Beep)</button></div><label for="choice">Voice selection</label><select id="choice"><option value="system">iPhone system default</option></select><p id="status" role="status" aria-live="polite">Ready for audio testing.</p></section><section class="panel"><h2>Exercise navigator</h2><div id="list"></div></section><section class="panel small"><strong>Symptom guidance:</strong> Stop exercises that cause increasing leg pain, tingling, numbness or weakness. Seek urgent medical assessment for new bladder or bowel dysfunction, saddle numbness or rapidly worsening weakness.</section></main><script>const REST = 15;
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S1 Radiculopathy Rehab Timer · Audio update 2026-11-06</title>
+<style>
+  :root{
+    --bg:#0f172a;
+    --panel:#111827;
+    --text:#f8fafc;
+    --muted:#cbd5e1;
+    --accent:#38bdf8;
+    --warn:#f59e0b;
+    --rest:#22c55e;
+    --danger:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:linear-gradient(180deg,#0f172a,#020617);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:18px;
+  }
+  .app{
+    width:min(760px,100%);
+    background:rgba(17,24,39,.96);
+    border:1px solid #334155;
+    border-radius:24px;
+    overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+  }
+  header{padding:18px 20px 10px;text-align:center}
+  h1{font-size:clamp(1.35rem,3vw,2rem);margin:0 0 6px}
+  .sub{color:var(--muted);font-size:.95rem}
+  .selector{
+    display:flex; gap:10px; padding:12px 20px 4px;
+  }
+  .selector button,.controls button{
+    flex:1;
+    border:0;
+    border-radius:14px;
+    padding:12px 14px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .selector button{
+    background:#1e293b;color:#e2e8f0;border:1px solid #334155;
+  }
+  .selector button.active{background:var(--accent);color:#082f49}
+  .stage{
+    padding:18px 20px 8px;
+    text-align:center;
+  }
+  .image-wrap{
+    width:100%;
+    aspect-ratio:16/9;
+    background:#f8fafc;
+    border-radius:18px;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:16px;
+  }
+  svg{width:100%;height:100%}
+  .exercise-photo{width:100%;height:100%;object-fit:contain;background:#f8fafc;display:block}
+  .phase{
+    text-transform:uppercase;
+    letter-spacing:.16em;
+    color:var(--accent);
+    font-size:.8rem;
+    font-weight:800;
+  }
+  .exercise{
+    font-size:clamp(1.5rem,4vw,2.4rem);
+    margin:8px 0 6px;
+    font-weight:800;
+  }
+  .cue{color:var(--muted);min-height:2.8em}
+  .timer{
+    font-variant-numeric:tabular-nums;
+    font-size:clamp(4.2rem,15vw,8rem);
+    line-height:1;
+    font-weight:900;
+    margin:14px 0 8px;
+  }
+  .timer.warn{color:var(--warn)}
+  .timer.rest{color:var(--rest)}
+  .progress-track{
+    height:10px;
+    background:#1e293b;
+    border-radius:999px;
+    overflow:hidden;
+    margin:10px 20px;
+  }
+  .progress{height:100%;width:0;background:var(--accent);transition:width .3s linear}
+  .statusrow{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:8px 20px 14px;
+    color:var(--muted);
+    font-size:.92rem;
+  }
+  .controls{
+    display:flex;
+    gap:10px;
+    padding:0 20px 20px;
+    flex-wrap:wrap;
+  }
+  .controls button{background:#e2e8f0;color:#0f172a;min-width:120px}
+  .controls .primary{background:var(--accent);color:#082f49}
+  .controls .danger{background:#fecaca;color:#7f1d1d}
+  .notes{
+    border-top:1px solid #334155;
+    padding:14px 20px 18px;
+    color:#cbd5e1;
+    font-size:.88rem;
+    line-height:1.45;
+  }
+  .notes strong{color:white}
+  @media (max-width:520px){
+    .controls button{min-width:calc(50% - 5px)}
+    .statusrow{font-size:.8rem}
+  }
+
+  .exercise-nav{border-top:1px solid #334155;padding:16px 20px 18px}
+  .exercise-nav h3{margin:0 0 10px;font-size:1rem;color:#f8fafc}
+  .exercise-list{display:grid;gap:8px}
+  .exercise-jump{width:100%;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #334155;background:#1e293b;color:#e2e8f0;border-radius:12px;padding:11px 12px;font-weight:700;cursor:pointer}
+  .exercise-jump.current{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.16);background:#0c4a6e}
+  .exercise-jump.completed{border-color:#166534;background:#052e16}
+  .exercise-jump .status{width:24px;height:24px;flex:0 0 24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #64748b;font-size:.9rem;font-weight:900}
+  .exercise-jump.completed .status{background:#22c55e;border-color:#22c55e;color:#052e16}
+  .exercise-jump.current .status{border-color:#7dd3fc;color:#7dd3fc}
+  .exercise-jump .jump-label{flex:1}
+
+
+  .rest-prep{margin-top:8px;color:#bbf7d0;font-weight:800;font-size:.95rem}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>S1 Radiculopathy Rehab Timer</h1>
+    <div class="sub">20-minute guided morning and evening sessions</div>
+  </header>
+
+  <div class="selector">
+    <button id="morningBtn" class="active">Morning</button>
+    <button id="eveningBtn">Evening</button>
+  </div>
+
+  <div class="stage">
+    <div class="image-wrap" id="imageWrap"></div>
+    <div class="phase" id="phaseLabel">READY</div>
+    <div class="exercise" id="exerciseName">Morning routine</div>
+    <div class="cue" id="cue">Press Start when ready.</div>
+    <div class="timer" id="timer">20:00</div>
+  </div>
+
+  <div class="progress-track"><div class="progress" id="progress"></div></div>
+  <div class="statusrow">
+    <span id="stepLabel">Exercise 1 of 11</span>
+    <span id="elapsedLabel">Session 00:00 / 20:00</span>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="startPauseBtn">Start</button>
+    <button id="previousBtn">Previous</button>
+    <button id="back10Btn">Back 10s</button>
+    <button id="forward10Btn">Forward 10s</button>
+    <button id="skipBtn">Skip</button>
+    <button class="danger" id="restartBtn">Restart</button>
+    <button id="voiceBtn">Voice: On</button>
+    <button id="testVoiceBtn">Test Voice</button>
+    <button id="simpleVoiceBtn">Test Basic iPhone Speech</button>
+    <label for="voiceChoice" style="width:100%;font-size:.9rem;color:#cbd5e1">Voice selection</label>
+    <select id="voiceChoice" style="width:100%;padding:12px;border-radius:10px;font-size:16px;background:#e4e8f2;color:#152238"><option value="system">System default (recommended test)</option></select>
+    <button id="audioBeepBtn">Test Sound (Beep)</button>
+    <button id="motivationBtn">Motivation: On</button>
+  </div>
+
+
+  <div id="voiceStatus" role="status" aria-live="polite" style="font-size:.9rem;color:#cbd5e1;margin:8px 0 12px">Tap Test Voice to check audio.</div>
+<div class="exercise-nav">
+    <h3 id="exerciseListTitle">Morning exercise list</h3>
+    <div class="exercise-list" id="exerciseList"></div>
+  </div>
+
+  <div class="notes">
+    <strong>Symptom rule:</strong> stop an exercise if it repeatedly drives pain, tingling or numbness farther down the leg or clearly worsens neurological symptoms.
+    Seek urgent assessment for new bladder/bowel disturbance, saddle numbness, or rapidly progressive weakness.<br><br><strong>Exercise photos:</strong> loaded from external physiotherapy/fitness sources, so an internet connection is required for the photos.
+  <br><br><strong>Gluteal strengthening:</strong> both sessions include three separate 1-minute seated hip-abduction exercises with a mini resistance band: upright, leaning forward and leaning backward, with a 10-second rest between each position. This is followed by 1 minute of crab walking with the band around the knees. The four supplied demonstration images are embedded directly in the app.
+</div>
+</div>
+
+<script>
+const REST = 15;
 
 
 const photoUrls = {
@@ -98,102 +302,595 @@ const routines = {
   ]
 };
 
+let routineKey='morning';
+let timeline=[];
+let index=0;
+let remaining=0;
+let sessionElapsed=0;
+let running=false;
+let ticker=null;
+let voiceOn=true;
+let warned10=false;
+let completedExercises=new Set();
+let motivationOn=true;
+let preferredVoice=null;
+let nextMotivationAt=null;
+let lastMotivationIndex=-1;
+let prompted60=false;
+let prompted30=false;
+
+const els = {
+  morningBtn:document.getElementById('morningBtn'),
+  eveningBtn:document.getElementById('eveningBtn'),
+  imageWrap:document.getElementById('imageWrap'),
+  phase:document.getElementById('phaseLabel'),
+  name:document.getElementById('exerciseName'),
+  cue:document.getElementById('cue'),
+  timer:document.getElementById('timer'),
+  progress:document.getElementById('progress'),
+  step:document.getElementById('stepLabel'),
+  elapsed:document.getElementById('elapsedLabel'),
+  startPause:document.getElementById('startPauseBtn'),
+  skip:document.getElementById('skipBtn'),
+  restart:document.getElementById('restartBtn'),
+  voice:document.getElementById('voiceBtn'),
+  exerciseList:document.getElementById('exerciseList'),
+  exerciseListTitle:document.getElementById('exerciseListTitle'),
+  motivation:document.getElementById('motivationBtn'),
+  previous:document.getElementById('previousBtn'),
+  back10:document.getElementById('back10Btn'),
+  forward10:document.getElementById('forward10Btn')
+};
 
 
-'use strict';
-const el=id=>document.getElementById(id);
-const U={picture:el('picture'),clock:el('clock'),phase:el('phase'),name:el('name'),cue:el('cue'),progress:el('progress'),elapsed:el('elapsed'),list:el('list'),status:el('status'),voice:el('voice'),motivation:el('motivation'),start:el('start'),choice:el('choice')};
-let mode='morning',plan=[],index=0,left=0,elapsed=0,running=false,timer=null,voiceOn=true,motivationOn=true,done=new Set(),flags=new Set(),lastEncouragement=0;
-const format=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
-const length=()=>plan.reduce((n,s)=>n+s.sec,0);
-const notice=s=>U.status.textContent=s;
-function assemble(){
- plan=[];routines[mode].forEach((x,i)=>{plan.push({...x,type:'exercise',number:i+1});if(i<routines[mode].length-1)plan.push({type:'rest',sec:Number.isFinite(x.restAfter)?x.restAfter:REST,number:i+1,name:'Rest'});});
+
+function nextExerciseAfterRest(restIndex){
+  for(let i=restIndex+1;i<timeline.length;i++){
+    if(timeline[i].kind==='exercise') return timeline[i];
+  }
+  return null;
 }
-function upcoming(i){return plan.slice(i+1).find(x=>x.type==='exercise');}
-function offset(i){return plan.slice(0,i).reduce((n,s)=>n+s.sec,0);}
-function paint(){
- const s=plan[index],next=s.type==='rest'?upcoming(index):null;
- U.picture.innerHTML=exerciseVisual(next?.img||s.img||'walk');
- U.phase.textContent=s.type==='rest'?'REST':'EXERCISE '+s.number+' OF '+routines[mode].length;
- U.name.textContent=next?'Next: '+next.name:s.name;
- U.cue.textContent=s.type==='rest'?(next?'Get ready: '+next.cue:'Prepare for the next exercise.'):s.cue;
- U.clock.textContent=format(left);U.elapsed.textContent='Session '+format(elapsed)+' / '+format(length());
- U.progress.max=length();U.progress.value=elapsed;U.start.textContent=running?'Pause':elapsed>=length()?'Restart':'Start / Resume';
- el('morning').classList.toggle('active',mode==='morning');el('evening').classList.toggle('active',mode==='evening');
- U.list.replaceChildren();
- routines[mode].forEach((x,i)=>{const b=document.createElement('button');b.textContent=(done.has(i+1)?'✓ ':'')+(i+1)+'. '+x.name;if(s.type==='exercise'&&s.number===i+1)b.classList.add('active');b.onclick=()=>jump(plan.findIndex(y=>y.type==='exercise'&&y.number===i+1));U.list.appendChild(b);});
+
+const motivationPhrases=[
+  "You're doing really well.",
+  "Keep it going, nice and steady.",
+  "Good work. Stay relaxed and keep moving.",
+  "That's it, keep the movement smooth.",
+  "Nice work. Keep your breathing easy.",
+  "You're doing great. Keep the pace comfortable.",
+  "Good control. Keep it up.",
+  "Stay with it, you're doing well.",
+  "Nearly there. Keep it smooth and controlled.",
+  "Great job. Keep going at your own pace."
+];
+
+
+
+function maybeSpeakMotivation(){
+  if(!motivationOn) return;
+  const item=timeline[index];
+  if(!item || item.kind!=='exercise') return;
+
+  // Initialise a fresh schedule when entering a new exercise.
+  if(lastMotivationIndex!==index || nextMotivationAt===null){
+    lastMotivationIndex=index;
+    // First encouragement after 10-15 seconds of work.
+    const firstDelay=10 + Math.floor(Math.random()*6);
+    nextMotivationAt=item.sec-firstDelay;
+  }
+
+  // Avoid speaking over the final 10-second warning.
+  if(remaining<=10 || (remaining<=62 && remaining>=57) || (remaining<=32 && remaining>=27)) return;
+
+  if(remaining<=nextMotivationAt){
+    speak(motivationPhrases[Math.floor(Math.random()*motivationPhrases.length)]);
+
+    // Next encouragement in another 10-15 seconds.
+    const gap=10 + Math.floor(Math.random()*6);
+    nextMotivationAt=remaining-gap;
+  }
 }
-function jump(i){if(i<0||i>=plan.length)return;index=i;left=plan[i].sec;elapsed=offset(i);flags.clear();lastEncouragement=0;paint();const s=plan[i],n=s.type==='rest'?upcoming(i):null;say(s.type==='rest'?'Rest for '+s.sec+' seconds. Next: '+(n?.name||'finish'):'Next exercise: '+s.name+'. '+s.cue);}
-function choose(m){stop();mode=m;assemble();done.clear();index=0;left=plan[0].sec;elapsed=0;flags.clear();paint();U.phase.textContent='READY';U.name.textContent=m==='morning'?'Morning routine':'Evening routine';U.cue.textContent='Press Start when ready.';U.start.textContent='Start';}
-function stop(){running=false;if(timer!==null){clearInterval(timer);timer=null;}}
-function toggle(){if(running){stop();paint();say('Paused.');return;}if(elapsed>=length())choose(mode);running=true;paint();say('Begin '+plan[index].name+'. '+(plan[index].cue||''));timer=setInterval(tick,1000);}
-const encouragement=["You're doing well. Keep going.","Good work. Stay relaxed.","Nice and steady. Keep breathing.","Great job. Keep the movement controlled."];
+
+function timelineIndexForExercise(exerciseIndex){
+  let count=-1;
+  for(let i=0;i<timeline.length;i++){
+    if(timeline[i].kind==='exercise'){
+      count++;
+      if(count===exerciseIndex) return i;
+    }
+  }
+  return 0;
+}
+
+function elapsedBeforeTimelineIndex(targetIndex){
+  let total=0;
+  for(let i=0;i<targetIndex;i++) total+=timeline[i].sec;
+  return total;
+}
+
+function currentExerciseNumber(){
+  if(!timeline.length) return 1;
+  return timeline[index].exerciseNumber;
+}
+
+function renderExerciseList(){
+  if(!els.exerciseList) return;
+  const arr=routines[routineKey];
+  els.exerciseListTitle.textContent=`${routineKey==='morning'?'Morning':'Evening'} exercise list`;
+  els.exerciseList.innerHTML='';
+  const currentNum=currentExerciseNumber();
+
+  arr.forEach((ex,i)=>{
+    const num=i+1;
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='exercise-jump';
+    if(completedExercises.has(num)) btn.classList.add('completed');
+    if(currentNum===num && !completedExercises.has(num)) btn.classList.add('current');
+
+    const status=document.createElement('span');
+    status.className='status';
+    status.textContent=completedExercises.has(num)?'✓':(currentNum===num?'▶':'');
+
+    const label=document.createElement('span');
+    label.className='jump-label';
+    label.textContent=`${num}. ${ex.name}`;
+
+    btn.appendChild(status);
+    btn.appendChild(label);
+    btn.addEventListener('click',()=>jumpToExercise(i));
+    els.exerciseList.appendChild(btn);
+  });
+}
+
+function jumpToExercise(exerciseIndex){
+  const target=timelineIndexForExercise(exerciseIndex);
+  sessionElapsed=elapsedBeforeTimelineIndex(target);
+  loadStep(target,true);
+  updateProgress();
+  renderExerciseList();
+  if(!running) els.startPause.textContent='Start';
+  setTimeout(()=>els.imageWrap.scrollIntoView({behavior:'smooth',block:'start'}),50);
+}
+
+function buildTimeline(){
+  timeline=[];
+  const arr=routines[routineKey];
+  arr.forEach((ex,i)=>{
+    timeline.push({kind:'exercise',...ex,exerciseNumber:i+1});
+    if(i<arr.length-1){
+      const restSeconds=Number.isFinite(ex.restAfter) ? ex.restAfter : REST;
+      timeline.push({
+        kind:'rest',name:'Rest',sec:restSeconds,img:'rest',
+        cue:`Next: ${arr[i+1].name}`,exerciseNumber:i+1
+      });
+    }
+  });
+}
+
+function fmt(s){
+  s=Math.max(0,Math.round(s));
+  const m=Math.floor(s/60), sec=s%60;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function choosePreferredVoice(){
+  if(!('speechSynthesis' in window)) return null;
+  const voices=speechSynthesis.getVoices();
+  if(!voices.length) return null;
+
+  const naturalHints=['enhanced','premium','natural','neural'];
+  const maleHints=['daniel','conor','liam','sean','colm','finn','cian','niall','ronan','tom','oliver','aaron'];
+
+  const scoreVoice=(v)=>{
+    const name=(v.name||'').toLowerCase();
+    const lang=(v.lang||'').toLowerCase();
+    let score=0;
+    if(lang.startsWith('en-ie')) score+=100;
+    else if(lang.startsWith('en-gb')) score+=70;
+    else if(lang.startsWith('en')) score+=40;
+
+    if(naturalHints.some(h=>name.includes(h))) score+=25;
+    if(maleHints.some(h=>name.includes(h))) score+=12;
+    if(v.localService) score+=3;
+    return score;
+  };
+
+  preferredVoice=[...voices].sort((a,b)=>scoreVoice(b)-scoreVoice(a))[0] || voices[0];
+  return preferredVoice;
+}
+
+let selectedVoiceKey='system';
+try{selectedVoiceKey=localStorage.getItem('s1-preferred-voice')||'system';}catch(e){}
+function populateVoiceChoices(){
+  const sel=document.getElementById('voiceChoice');
+  if(!sel || !('speechSynthesis' in window))return;
+  const voices=window.speechSynthesis.getVoices();
+  const prev=selectedVoiceKey;
+  sel.innerHTML='';
+  const base=document.createElement('option');base.value='system';base.textContent='System default (recommended test)';sel.appendChild(base);
+  voices.filter(v=>/^en[-_]/i.test(v.lang)).sort((a,b)=>a.lang.localeCompare(b.lang)||a.name.localeCompare(b.name)).forEach(v=>{
+    const o=document.createElement('option');o.value=v.voiceURI;o.textContent=v.name+' ('+v.lang+')';sel.appendChild(o);
+  });
+  sel.value=[...sel.options].some(o=>o.value===prev)?prev:'system';
+  selectedVoiceKey=sel.value;
+}
+
+let beepContext=null;
+let beepEndTimer=null;
+function testAudioBeep(){
+  const AudioCtx=window.AudioContext||window.webkitAudioContext;
+  if(!AudioCtx){showVoiceStatus('Sound test unavailable: Web Audio unsupported.');return;}
+  try{
+    if(!beepContext||beepContext.state==='closed')beepContext=new AudioCtx();
+    const ctx=beepContext;
+    // Start the oscillator directly in the button's user gesture.
+    const osc=ctx.createOscillator(),gain=ctx.createGain();
+    osc.type='sine';osc.frequency.value=660;
+    gain.gain.setValueAtTime(.16,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.45);
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);osc.stop(ctx.currentTime+.46);
+    const resumed=ctx.state==='suspended'?ctx.resume():Promise.resolve();
+    Promise.resolve(resumed).then(()=>showVoiceStatus('Beep played • audio '+ctx.state))
+      .catch(e=>showVoiceStatus('Beep audio error: '+e.message));
+    if(beepEndTimer)clearTimeout(beepEndTimer);
+    beepEndTimer=setTimeout(()=>{try{if(ctx.state==='running')ctx.suspend();}catch(e){}},900);
+  }catch(e){showVoiceStatus('Beep error: '+e.message);}
+}
+let activeUtterance=null;
+let speechToken=0;
+let speechRetryTimer=null;
+let voiceStatusTimer=null;
+let voiceQueueTimer=null;
+let voiceStartedAt=0;
+let speechFallbackAttempt=0;
+let voiceTestActive=false;
+const silentVoiceKeys=new Set();
+let workingVoiceKey=null;
+function showVoiceStatus(message){
+  const el=document.getElementById('voiceStatus');
+  if(el)el.textContent=message;
+}
+function unlockSpeech(){
+  if(!('speechSynthesis' in window))return;
+  try{if(speechSynthesis.paused)speechSynthesis.resume();}catch(e){}
+}
+function voiceCandidates(){
+  const voices=speechSynthesis.getVoices();
+  const preferred=selectedVoiceKey!=='system'?voices.find(v=>v.voiceURI===selectedVoiceKey):null;
+  const english=voices.filter(v=>/^en[-_]/i.test(v.lang));
+  const rank=v=>{
+    const n=v.name.toLowerCase();
+    return (n.includes('moira')?100:0)+(n.includes('compact')?25:0)-(n.includes('enhanced')?15:0);
+  };
+  english.sort((a,b)=>rank(b)-rank(a));
+  const options=[];
+  const add=v=>{const key=v?.voiceURI||'system';if(!options.some(x=>(x?.voiceURI||'system')===key)&&!silentVoiceKeys.has(key))options.push(v);};
+  if(workingVoiceKey){add(voices.find(v=>v.voiceURI===workingVoiceKey));}
+  if(preferred)add(preferred);
+  add(null);
+  english.forEach(add);
+  return options;
+}
+function resetVoiceEngine(){
+  ++speechToken;
+  clearTimeout(speechRetryTimer);clearTimeout(voiceStatusTimer);clearTimeout(voiceQueueTimer);
+  activeUtterance=null;
+  try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch(e){}
+}
+function speak(text, opts={}){
+  if(!voiceOn)return;
+  if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){
+    showVoiceStatus('Voice playback is unavailable in this browser.');return;
+  }
+  const synth=speechSynthesis,token=++speechToken;
+  clearTimeout(speechRetryTimer);clearTimeout(voiceStatusTimer);clearTimeout(voiceQueueTimer);
+  const candidates=voiceCandidates();
+  let attempt=0;
+  function tryCandidate(){
+    if(token!==speechToken)return;
+    if(attempt>=candidates.length){
+      showVoiceStatus('No voice produced a reliable completion. Safari speech output may be blocked.');
+      return;
+    }
+    const v=candidates[attempt++],key=v?.voiceURI||'system';
+    const u=new SpeechSynthesisUtterance(text);activeUtterance=u;
+    if(v){u.voice=v;u.lang=v.lang;}
+    u.rate=1;u.pitch=1;u.volume=1;
+    let started=false,finished=false;
+    const expectedMs=Math.min(12000,Math.max(650,text.length*38));
+    const fallback=(why)=>{
+      if(token!==speechToken||finished)return;
+      finished=true;silentVoiceKeys.add(key);
+      showVoiceStatus((v?.name||'System voice')+' '+why+' • trying another voice');
+      if(synth.speaking||synth.pending){
+        try{synth.cancel();}catch(e){}
+        voiceQueueTimer=setTimeout(tryCandidate,250);
+      }else voiceQueueTimer=setTimeout(tryCandidate,80);
+    };
+    u.onstart=()=>{
+      if(token!==speechToken)return;
+      started=true;voiceStartedAt=Date.now();
+      showVoiceStatus('Speaking • '+(v?.name||'System voice')+' (attempt '+attempt+')');
+    };
+    u.onend=()=>{
+      if(token!==speechToken||finished)return;
+      const duration=Date.now()-voiceStartedAt;
+      if(!started||duration<Math.min(550,expectedMs*.5)){fallback('finished unusually quickly');return;}
+      finished=true;workingVoiceKey=key==='system'?null:key;
+      activeUtterance=null;
+      clearTimeout(voiceStatusTimer);
+      showVoiceStatus('Voice completed • '+(v?.name||'System voice'));
+    };
+    u.onerror=e=>fallback('error '+(e.error||'unknown'));
+    try{
+      synth.speak(u);
+      showVoiceStatus('Requesting voice • '+(v?.name||'System voice'));
+      voiceStatusTimer=setTimeout(()=>{
+        if(token===speechToken&&!started&&!finished)fallback('did not start');
+      },3000);
+    }catch(e){fallback('request failed');}
+  }
+  // Only cancel if something is actually queued. Give WebKit time to settle.
+  if(synth.speaking||synth.pending){
+    try{synth.cancel();}catch(e){}
+    showVoiceStatus('Clearing previous speech…');
+    voiceQueueTimer=setTimeout(tryCandidate,250);
+  }else tryCandidate();
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    resetVoiceEngine();
+    showVoiceStatus('Voice engine refreshed after returning to the app.');
+  }
+});
+function totalDuration(){ return timeline.reduce((a,b)=>a+b.sec,0); }
+
+function loadStep(i, announce=false){
+  index=i;
+  const item=timeline[index];
+  remaining=item.sec;
+  warned10=false;
+  nextMotivationAt=null;
+  lastMotivationIndex=-1;
+  prompted60=false;
+  prompted30=false;
+  if(item.kind==='rest'){
+    const nextEx=nextExerciseAfterRest(index);
+    if(nextEx){
+      els.imageWrap.innerHTML=exerciseVisual(nextEx.img);
+      els.phase.textContent='REST • NEXT EXERCISE';
+      els.phase.style.color='var(--rest)';
+      els.name.textContent=`Next: ${nextEx.name}`;
+      els.cue.innerHTML=`${nextEx.cue}<div class="rest-prep">Use this rest to check the picture, get into position and prepare.</div>`;
+    }else{
+      els.imageWrap.innerHTML=exerciseVisual('walk');
+      els.phase.textContent='REST';
+      els.phase.style.color='var(--rest)';
+      els.name.textContent='Rest';
+      els.cue.textContent='Relax and prepare to finish.';
+    }
+  }else{
+    els.imageWrap.innerHTML=exerciseVisual(item.img);
+    els.phase.textContent='EXERCISE';
+    els.phase.style.color='var(--accent)';
+    els.name.textContent=item.name;
+    els.cue.textContent=item.cue;
+  }
+  els.timer.textContent=fmt(remaining);
+  els.timer.className='timer'+(item.kind==='rest'?' rest':'');
+  const exCount=routines[routineKey].length;
+  els.step.textContent=item.kind==='rest'
+    ? `Rest • ${item.cue}`
+    : `Exercise ${item.exerciseNumber} of ${exCount}`;
+  updateProgress();
+  renderExerciseList();
+  if(announce){
+    if(item.kind==='rest'){ const nx=nextExerciseAfterRest(index); speak(nx ? `Rest for ${item.sec} seconds. Next exercise: ${nx.name}. ${nx.cue}` : `Rest for ${item.sec} seconds.`); }
+    else speak(`Next exercise: ${item.name}.`);
+  }
+}
+
+function updateProgress(){
+  const total=totalDuration();
+  els.elapsed.textContent=`Session ${fmt(sessionElapsed)} / ${fmt(total)}`;
+  els.progress.style.width=`${Math.min(100,(sessionElapsed/total)*100)}%`;
+}
+
 function tick(){
- if(!running)return;
- const s=plan[index];left=Math.max(0,left-1);elapsed=Math.min(length(),elapsed+1);
- if(s.type==='exercise'){
-  if(left===60&&!flags.has('60')){flags.add('60');say('One minute remaining.');}
-  if(left===30&&!flags.has('30')){flags.add('30');say('Thirty seconds remaining.');}
-  if(motivationOn&&left>12&&left%25===0&&left!==60&&left!==30&&left!==lastEncouragement){lastEncouragement=left;say(encouragement[Math.floor(Math.random()*encouragement.length)]);}
- }
- if(left===10&&!flags.has('10')){flags.add('10');say('Ten seconds remaining.');}
- if(left===0){if(s.type==='exercise')done.add(s.number);if(index<plan.length-1){index++;left=plan[index].sec;flags.clear();const n=plan[index],next=n.type==='rest'?upcoming(index):null;say(n.type==='rest'?'Rest for '+n.sec+' seconds. Next: '+(next?.name||'finish'):'Next exercise: '+n.name+'. '+n.cue);}
- else{stop();elapsed=length();paint();U.phase.textContent='COMPLETE';U.name.textContent='Session complete';say('Session complete. Well done.');return;}}
- paint();
+  if(!running) return;
+  if(voiceOn && 'speechSynthesis' in window && speechSynthesis.paused) speechSynthesis.resume();
+  remaining--;
+  sessionElapsed++;
+  const item=timeline[index];
+
+
+  if(item.kind==='exercise' && remaining===60 && !prompted60){
+    prompted60=true;
+    speak("You're doing great, just one minute left.");
+  } else if(item.kind==='exercise' && remaining===30 && !prompted30){
+    prompted30=true;
+    speak("Great job, keep going, just thirty seconds left.");
+  } else {
+    maybeSpeakMotivation();
+  }
+
+  if(remaining===10 && !warned10){
+    warned10=true;
+    speak('10 seconds remaining.');
+  }
+
+  if(remaining<=0){
+    if(item.kind==='exercise'){
+      completedExercises.add(item.exerciseNumber);
+      renderExerciseList();
+    }
+    if(index < timeline.length-1){
+      loadStep(index+1,true);
+    } else {
+      running=false;
+      clearInterval(ticker);
+      ticker=null;
+      remaining=0;
+      els.timer.textContent='00:00';
+      els.startPause.textContent='Start';
+      els.phase.textContent='COMPLETE';
+      els.name.textContent='Session complete';
+      els.cue.textContent='Well done. Finish with comfortable movement.';
+      els.imageWrap.innerHTML=exerciseVisual('walk');
+      sessionElapsed=totalDuration();
+      updateProgress();
+      speak('Session complete.');
+      return;
+    }
+  }
+
+  els.timer.textContent=fmt(remaining);
+  els.timer.className='timer'+(item.kind==='rest'?' rest':'')+(remaining<=10 && item.kind!=='rest'?' warn':'');
+  updateProgress();
 }
-function adjust(seconds){const amount=seconds<0?Math.min(-seconds,plan[index].sec-left):Math.min(seconds,left);left+=seconds<0?amount:-amount;elapsed+=seconds<0?-amount:amount;if(left===0&&index<plan.length-1){index++;left=plan[index].sec;flags.clear();say('Next: '+plan[index].name);}paint();}
-function previous(){let i=index-1;while(i>0&&plan[i].type!=='exercise')i--;jump(Math.max(0,i));}
-function skip(){if(index<plan.length-1)jump(index+1);else{stop();elapsed=length();paint();}}
-let currentSpeech=null,speechSequence=0;
-function speechVoices(){try{return speechSynthesis.getVoices()||[];}catch(e){return [];}}
-function populateVoices(){
- if(!('speechSynthesis' in window))return;
- const prior=U.choice.value||'system';U.choice.replaceChildren();
- const add=(key,label)=>{const o=document.createElement('option');o.value=key;o.textContent=label;U.choice.appendChild(o);};
- add('system','iPhone system default');
- speechVoices().filter(v=>/^en(?:-|_|$)/i.test(v.lang)).forEach(v=>add(v.voiceURI,v.name+' ('+v.lang+')'));
- U.choice.value=[...U.choice.options].some(o=>o.value===prior)?prior:'system';
+
+function startPause(){
+  if(!running){
+    if(sessionElapsed>=totalDuration()) restart(false);
+    running=true;
+    unlockSpeech();
+    els.startPause.textContent='Pause';
+    const item=timeline[index];
+    speak(item.kind==='rest' ? 'Rest.' : `Begin ${item.name}.`);
+    ticker=setInterval(tick,1000);
+  }else{
+    running=false;
+    els.startPause.textContent='Resume';
+    clearInterval(ticker); ticker=null;
+    speak('Paused.');
+  }
 }
-function say(words){
- if(!voiceOn)return;
- if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){notice('Speech synthesis unavailable');return;}
- const id=++speechSequence,synth=speechSynthesis;
- try{
-  if(synth.pending||synth.speaking)synth.cancel();
-  const utterance=new SpeechSynthesisUtterance(words);currentSpeech=utterance;
-  const v=speechVoices().find(v=>v.voiceURI===U.choice.value);
-  if(v){utterance.voice=v;utterance.lang=v.lang;}
-  utterance.rate=1;utterance.volume=1;
-  utterance.onstart=()=>{if(id===speechSequence)notice('Voice started: '+(v?.name||'system default'));};
-  utterance.onend=()=>{if(id===speechSequence){currentSpeech=null;notice('Voice finished');}};
-  utterance.onerror=e=>{if(id===speechSequence)notice('Voice error: '+(e.error||'unknown'));};
-  synth.speak(utterance);notice('Requesting speech…');
- }catch(e){notice('Voice error: '+e.message);}
+
+
+function previousExercise(){
+  // Find the previous exercise in the timeline.
+  let target=index-1;
+  if(timeline[index] && timeline[index].kind==='exercise') target=index-1;
+  for(let i=target;i>=0;i--){
+    if(timeline[i].kind==='exercise'){
+      sessionElapsed=elapsedBeforeTimelineIndex(i);
+      loadStep(i,true);
+      updateProgress();
+      renderExerciseList();
+      return;
+    }
+  }
+  // If already at the first exercise, restart that exercise.
+  sessionElapsed=0;
+  loadStep(0,true);
+  updateProgress();
 }
-// Web Audio test: construct oscillator and start it synchronously in the tap.
-let soundContext=null;
-function beep(){
- try{
-  const Context=window.AudioContext||window.webkitAudioContext;
-  if(!Context){notice('AudioContext unavailable');return;}
-  if(!soundContext)soundContext=new Context();
-  const osc=soundContext.createOscillator(),gain=soundContext.createGain();
-  osc.type='sine';osc.frequency.value=700;
-  gain.gain.setValueAtTime(0.18,soundContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001,soundContext.currentTime+0.55);
-  osc.connect(gain);gain.connect(soundContext.destination);
-  osc.start();osc.stop(soundContext.currentTime+0.56);
-  if(soundContext.state==='suspended')soundContext.resume().then(()=>notice('Sound test: '+soundContext.state)).catch(e=>notice('Audio error: '+e.message));
-  else notice('Sound test playing ('+soundContext.state+')');
- }catch(e){notice('Sound error: '+e.message);}
+
+function seekWithinStep(seconds){
+  const item=timeline[index];
+  if(!item) return;
+
+  if(seconds>0){
+    // Move forward by reducing time remaining.
+    const move=Math.min(seconds, Math.max(0, remaining));
+    remaining-=move;
+    sessionElapsed+=move;
+
+    if(remaining<=0){
+      if(index<timeline.length-1){
+        loadStep(index+1,true);
+      }else{
+        remaining=0;
+      }
+    }
+  }else if(seconds<0){
+    // Move backward, but not earlier than the start of the current step.
+    const maxBack=item.sec-remaining;
+    const move=Math.min(-seconds, Math.max(0,maxBack));
+    remaining+=move;
+    sessionElapsed=Math.max(0,sessionElapsed-move);
+    warned10=remaining<=10;
+    prompted60=remaining<60;
+    prompted30=remaining<30;
+  }
+
+  els.timer.textContent=fmt(remaining);
+  updateProgress();
 }
-el('morning').onclick=()=>choose('morning');el('evening').onclick=()=>choose('evening');
-U.start.onclick=toggle;el('previous').onclick=previous;el('back').onclick=()=>adjust(-10);el('forward').onclick=()=>adjust(10);el('skip').onclick=skip;el('restart').onclick=()=>choose(mode);
-U.voice.onclick=()=>{voiceOn=!voiceOn;U.voice.textContent='Voice: '+(voiceOn?'On':'Off');if(voiceOn)say('Voice prompts enabled');else{++speechSequence;if('speechSynthesis' in window)speechSynthesis.cancel();}};
-U.motivation.onclick=()=>{motivationOn=!motivationOn;U.motivation.textContent='Motivation: '+(motivationOn?'On':'Off');};
-el('testVoice').onclick=()=>{voiceOn=true;U.voice.textContent='Voice: On';say('Hello. Your exercise programme voice is ready.');};
-el('testBeep').onclick=beep;
-if('speechSynthesis' in window)speechSynthesis.addEventListener?.('voiceschanged',populateVoices);
-populateVoices();choose('morning');
-</script></body></html>
+
+function skip(){
+  if(index<timeline.length-1){
+    sessionElapsed += remaining;
+    loadStep(index+1,true);
+  } else {
+    sessionElapsed=totalDuration();
+    tick();
+  }
+}
+
+function restart(announce=true){
+  running=false;
+  if(ticker){clearInterval(ticker);ticker=null;}
+  sessionElapsed=0;
+  completedExercises.clear();
+  buildTimeline();
+  loadStep(0,false);
+  els.startPause.textContent='Start';
+  if(announce) speak('Session reset.');
+}
+
+function selectRoutine(key){
+  routineKey=key;
+  els.morningBtn.classList.toggle('active',key==='morning');
+  els.eveningBtn.classList.toggle('active',key==='evening');
+  restart(false);
+  els.name.textContent=key==='morning'?'Morning routine':'Evening routine';
+  els.cue.textContent='Press Start when ready.';
+  els.phase.textContent='READY';
+  els.timer.textContent='20:00';
+}
+
+
+if('speechSynthesis' in window){
+  choosePreferredVoice();
+  speechSynthesis.onvoiceschanged=()=>{choosePreferredVoice();populateVoiceChoices();};
+}
+
+els.motivation.addEventListener('click',()=>{
+  motivationOn=!motivationOn;
+  els.motivation.textContent=`Motivation: ${motivationOn?'On':'Off'}`;
+  if(motivationOn) speak('Motivational prompts on.');
+});
+
+els.previous.addEventListener('click',previousExercise);
+els.back10.addEventListener('click',()=>seekWithinStep(-10));
+els.forward10.addEventListener('click',()=>seekWithinStep(10));
+els.startPause.addEventListener('click',startPause);
+els.skip.addEventListener('click',skip);
+els.restart.addEventListener('click',()=>restart(true));
+els.voice.addEventListener('click',()=>{
+  voiceOn=!voiceOn;
+  els.voice.textContent=`Voice: ${voiceOn?'On':'Off'}`;
+  if(voiceOn){ unlockSpeech(); speak('Voice prompts on.'); }
+  else if('speechSynthesis' in window){ resetVoiceEngine(); }
+});
+document.getElementById('voiceChoice').addEventListener('change',e=>{selectedVoiceKey=e.target.value;workingVoiceKey=null;silentVoiceKeys.clear();try{localStorage.setItem('s1-preferred-voice',selectedVoiceKey);}catch(err){}showVoiceStatus('Selected: '+e.target.options[e.target.selectedIndex].text+'. Tap Test Voice.');});
+document.getElementById('audioBeepBtn').addEventListener('click',testAudioBeep);
+document.getElementById('simpleVoiceBtn').addEventListener('click',()=>{voiceOn=true;els.voice.textContent='Voice: On';resetVoiceEngine();silentVoiceKeys.clear();workingVoiceKey=null;speak('Hello. This is a basic iPhone speech test.');});
+document.getElementById('testVoiceBtn').addEventListener('click',()=>{voiceOn=true;els.voice.textContent='Voice: On';resetVoiceEngine();silentVoiceKeys.clear();workingVoiceKey=null;setTimeout(()=>speak('Voice test. You are doing great. Keep it up!'),250);});
+els.morningBtn.addEventListener('click',()=>selectRoutine('morning'));
+els.eveningBtn.addEventListener('click',()=>selectRoutine('evening'));
+
+populateVoiceChoices();
+buildTimeline();
+loadStep(0,false);
+renderExerciseList();
+els.name.textContent='Morning routine';
+els.cue.textContent='Press Start when ready.';
+els.phase.textContent='READY';
+els.timer.textContent='20:00';
+</script>
+</body>
+</html>
