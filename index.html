@@ -179,6 +179,7 @@
     <button id="skipBtn">Skip</button>
     <button class="danger" id="restartBtn">Restart</button>
     <button id="voiceBtn">Voice: On</button>
+    <button id="testVoiceBtn">Test Voice</button>
     <button id="motivationBtn">Motivation: On</button>
   </div>
 
@@ -494,17 +495,40 @@ function choosePreferredVoice(){
   return preferredVoice;
 }
 
+let activeUtterance=null;
+let speechToken=0;
+let speechRetryTimer=null;
+
+function unlockSpeech(){
+  if(!('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.resume();
+    // iOS Safari may require speech to be initiated by a direct tap.
+    const u=new SpeechSynthesisUtterance(' ');
+    u.volume=0;
+    speechSynthesis.speak(u);
+  }catch(e){ console.warn('Speech unlock:',e); }
+}
+
 function speak(text){
   if(!voiceOn || !('speechSynthesis' in window)) return;
+  const synth=window.speechSynthesis;
   if(!preferredVoice) choosePreferredVoice();
-  speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);
-  if(preferredVoice) u.voice=preferredVoice;
-  u.lang=(preferredVoice && preferredVoice.lang) ? preferredVoice.lang : 'en-IE';
-  u.rate=0.92;
-  u.pitch=0.98;
-  u.volume=1.0;
-  speechSynthesis.speak(u);
+  const token=++speechToken;
+  if(speechRetryTimer) clearTimeout(speechRetryTimer);
+  try{ synth.cancel(); synth.resume(); }catch(e){}
+  // Safari sometimes drops a new utterance when cancel and speak occur in the same turn.
+  speechRetryTimer=setTimeout(()=>{
+    if(token!==speechToken || !voiceOn) return;
+    const u=new SpeechSynthesisUtterance(text);
+    activeUtterance=u; // retain reference for Safari
+    if(preferredVoice) u.voice=preferredVoice;
+    u.lang=preferredVoice?.lang || 'en-IE';
+    u.rate=0.94; u.pitch=1; u.volume=1;
+    u.onerror=e=>{ console.warn('Voice prompt error:',e.error); };
+    u.onend=()=>{ if(activeUtterance===u) activeUtterance=null; };
+    try{ synth.resume(); synth.speak(u); }catch(e){console.warn('Voice playback failed:',e);}
+  },100);
 }
 
 function totalDuration(){ return timeline.reduce((a,b)=>a+b.sec,0); }
@@ -562,6 +586,7 @@ function updateProgress(){
 
 function tick(){
   if(!running) return;
+  if(voiceOn && 'speechSynthesis' in window && speechSynthesis.paused) speechSynthesis.resume();
   remaining--;
   sessionElapsed++;
   const item=timeline[index];
@@ -616,6 +641,7 @@ function startPause(){
   if(!running){
     if(sessionElapsed>=totalDuration()) restart(false);
     running=true;
+    unlockSpeech();
     els.startPause.textContent='Pause';
     const item=timeline[index];
     speak(item.kind==='rest' ? 'Rest.' : `Begin ${item.name}.`);
@@ -733,9 +759,10 @@ els.restart.addEventListener('click',()=>restart(true));
 els.voice.addEventListener('click',()=>{
   voiceOn=!voiceOn;
   els.voice.textContent=`Voice: ${voiceOn?'On':'Off'}`;
-  if(voiceOn) speak('Voice prompts on.');
-  else if('speechSynthesis' in window) speechSynthesis.cancel();
+  if(voiceOn){ unlockSpeech(); speak('Voice prompts on.'); }
+  else if('speechSynthesis' in window){ ++speechToken; clearTimeout(speechRetryTimer); speechSynthesis.cancel(); }
 });
+document.getElementById('testVoiceBtn').addEventListener('click',()=>{voiceOn=true; els.voice.textContent='Voice: On'; unlockSpeech(); speak('Voice test. You are doing great. Keep it up!');});
 els.morningBtn.addEventListener('click',()=>selectRoutine('morning'));
 els.eveningBtn.addEventListener('click',()=>selectRoutine('evening'));
 
