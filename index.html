@@ -538,48 +538,84 @@ function showVoiceStatus(message){
   const el=document.getElementById('voiceStatus');
   if(el) el.textContent=message;
 }
-function unlockSpeech(){
-  if(!('speechSynthesis' in window)) {showVoiceStatus('Speech synthesis is not available in this browser.');return;}
-  try{window.speechSynthesis.resume();}catch(e){}
+// iOS Safari speech bridge: set the audio session before requesting speech,
+// keep utterances alive, and prevent stale speech events from changing UI.
+let speechSessionGeneration=0;
+let speechWatchdog=null;
+function prepareSpeechAudio(){
+  try{
+    if(navigator.audioSession && navigator.audioSession.type!=='playback'){
+      navigator.audioSession.type='playback';
+    }
+  }catch(e){ /* Audio Session API is optional on Safari. */ }
 }
-function speak(text){
-  if(!voiceOn) return;
-  if(!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)){
-    showVoiceStatus('Voice playback is unavailable in this browser. Open in Safari.');
+function unlockSpeech(){
+  if(!('speechSynthesis' in window)){
+    showVoiceStatus('Speech synthesis is not available in this browser.');
     return;
   }
+  prepareSpeechAudio();
+  try{if(speechSynthesis.paused)speechSynthesis.resume();}catch(e){}
+}
+function speak(text, options={}){
+  if(!voiceOn)return;
+  if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){
+    showVoiceStatus('Speech synthesis is unavailable in this browser.');
+    return;
+  }
+  prepareSpeechAudio();
   const synth=window.speechSynthesis;
-  const token=++speechToken;
+  const generation=++speechSessionGeneration;
+  ++speechToken;
   if(speechRetryTimer)clearTimeout(speechRetryTimer);
   if(voiceStatusTimer)clearTimeout(voiceStatusTimer);
-  // Avoid cancel() immediately before speak(): some iOS WebKit versions report
-  // onstart but emit no audible audio after this sequence.
-  try{if(synth.paused)synth.resume();}catch(e){}
-  const u=new SpeechSynthesisUtterance(text);
-  activeUtterance=u;
+  if(speechWatchdog)clearTimeout(speechWatchdog);
+  // Stop any old announcement only if one is actually active or queued.
+  // iOS may silently drop speak() after unconditional cancel() calls.
+  if(synth.speaking||synth.pending){
+    try{synth.cancel();}catch(e){}
+  }
+  const utterance=new SpeechSynthesisUtterance(text);
+  activeUtterance=utterance;
   const voices=synth.getVoices();
   const manual=selectedVoiceKey!=='system'?voices.find(v=>v.voiceURI===selectedVoiceKey):null;
-  if(manual)u.voice=manual;
-  // When testing the system default, leave voice unset so iOS chooses its own.
-  if(manual)u.lang=manual.lang;
-  // Do not override the system voice language in automatic mode.
-  u.rate=1;u.pitch=1;u.volume=1;
-  u.onstart=()=>{if(token===speechToken)showVoiceStatus('Speaking • '+(u.voice?.name || 'System voice'));};
-  u.onend=()=>{if(token===speechToken){showVoiceStatus('Voice ready');activeUtterance=null;}};
-  u.onerror=e=>{if(token===speechToken)showVoiceStatus('Voice error: '+(e.error||'unknown')+' — try Test Voice again.');};
+  if(manual){utterance.voice=manual;utterance.lang=manual.lang;}
+  // For system mode, leave voice and lang unspecified for iOS selection.
+  utterance.rate=1;utterance.pitch=1;utterance.volume=1;
+  let started=false;
+  const current=()=>generation===speechSessionGeneration;
+  utterance.onstart=()=>{
+    if(!current())return;
+    started=true;
+    showVoiceStatus('Speech started • '+(utterance.voice?.name||'iPhone default')+
+      ' • audio '+(navigator.audioSession?.type||'system'));
+  };
+  utterance.onend=()=>{
+    if(!current())return;
+    if(speechWatchdog)clearTimeout(speechWatchdog);
+    activeUtterance=null;
+    showVoiceStatus('Speech finished');
+  };
+  utterance.onerror=(event)=>{
+    if(!current())return;
+    if(speechWatchdog)clearTimeout(speechWatchdog);
+    activeUtterance=null;
+    showVoiceStatus('Speech error: '+(event.error||'unknown'));
+  };
   try{
-    if(synth.speaking || synth.pending){
-      // Queueing is safer than cancelling immediately before speak on iOS.
-      showVoiceStatus('Voice queued…');
-    }
-    synth.speak(u);
-    showVoiceStatus('Starting voice…');
-    voiceStatusTimer=setTimeout(()=>{
-      if(token===speechToken && !synth.speaking && !synth.pending){
-        showVoiceStatus('No audio started. Check silent mode, volume, and Safari voice settings; tap Test Voice again.');
+    // Keep speak() in the originating tap handler for iOS gesture activation.
+    synth.speak(utterance);
+    showVoiceStatus('Requesting iPhone speech…');
+    speechWatchdog=setTimeout(()=>{
+      if(!current())return;
+      if(!started){
+        showVoiceStatus('Speech did not start • pending '+synth.pending+
+          ' • paused '+synth.paused+' • audio '+(navigator.audioSession?.type||'system'));
+      }else if(synth.speaking){
+        showVoiceStatus('Speech engine active • if silent, Safari audio routing may be blocked');
       }
-    },1800);
-  }catch(e){showVoiceStatus('Voice failed: '+e.message);}
+    },2500);
+  }catch(e){if(current())showVoiceStatus('Speech request failed: '+e.message);}
 }
 
 function totalDuration(){ return timeline.reduce((a,b)=>a+b.sec,0); }
@@ -811,20 +847,14 @@ els.voice.addEventListener('click',()=>{
   voiceOn=!voiceOn;
   els.voice.textContent=`Voice: ${voiceOn?'On':'Off'}`;
   if(voiceOn){ unlockSpeech(); speak('Voice prompts on.'); }
-  else if('speechSynthesis' in window){ ++speechToken; clearTimeout(speechRetryTimer); speechSynthesis.cancel(); }
+  else if('speechSynthesis' in window){ ++speechToken; ++speechSessionGeneration; clearTimeout(speechRetryTimer); if(speechWatchdog)clearTimeout(speechWatchdog); speechSynthesis.cancel(); activeUtterance=null; }
 });
 document.getElementById('voiceChoice').addEventListener('change',e=>{selectedVoiceKey=e.target.value;showVoiceStatus('Selected: '+e.target.options[e.target.selectedIndex].text+'. Tap Test Voice.');});
 document.getElementById('audioBeepBtn').addEventListener('click',testAudioBeep);
 document.getElementById('simpleVoiceBtn').addEventListener('click',()=>{
   if(!('speechSynthesis' in window)){showVoiceStatus('Speech synthesis unavailable');return;}
-  // Intentionally no voice, locale, cancel, resume, or asynchronous delay.
-  const u=new SpeechSynthesisUtterance('Hello. This is a basic speech test.');
-  u.volume=1;u.rate=1;
-  activeUtterance=u;
-  u.onstart=()=>showVoiceStatus('Basic speech started');
-  u.onend=()=>showVoiceStatus('Basic speech finished');
-  u.onerror=e=>showVoiceStatus('Basic speech error: '+e.error);
-  speechSynthesis.speak(u);
+  voiceOn=true;els.voice.textContent='Voice: On';
+  speak('Hello. This is a basic iPhone speech test.');
 });
 document.getElementById('testVoiceBtn').addEventListener('click',()=>{voiceOn=true; els.voice.textContent='Voice: On'; speak('Voice test. You are doing great. Keep it up!');});
 els.morningBtn.addEventListener('click',()=>selectRoutine('morning'));
